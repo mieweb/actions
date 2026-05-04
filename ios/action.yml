@@ -16,20 +16,23 @@ inputs:
     description: "Bundle ID (e.g. org.mieweb.os.dev)"
     required: true
   apple_team_id:
-    description: "Apple Developer Team ID"
-    required: true
+    description: "Apple Developer Team ID. Defaults to env.APPLE_TEAM_ID."
+    required: false
+    default: ${{ env.APPLE_TEAM_ID }}
 
-  # ── Match-mode inputs (ignored when signing_mode=secrets) ─────────────────
+  # ── Match-mode inputs (ignored when signing_mode=secrets) ─────────────
   match_git_url:
     description: "HTTPS URL of the match signing repo"
     required: false
     default: "https://github.com/mieweb/mobile-signing"
   match_git_basic_authorization:
-    description: "Base64-encoded user:token for match git repo"
+    description: "Base64-encoded user:token for match git repo. Defaults to env.MATCH_GIT_BASIC_AUTHORIZATION."
     required: false
+    default: ${{ env.MATCH_GIT_BASIC_AUTHORIZATION }}
   match_password:
-    description: "Encryption passphrase for match-stored certs/profiles"
+    description: "Encryption passphrase for match-stored certs/profiles. Defaults to env.MATCH_PASSWORD."
     required: false
+    default: ${{ env.MATCH_PASSWORD }}
   match_type:
     description: "Match profile type"
     required: false
@@ -52,14 +55,17 @@ inputs:
 
   # ── App Store Connect API ─────────────────────────────────────────────────
   apple_api_key_id:
-    description: "App Store Connect API Key ID"
-    required: true
+    description: "App Store Connect API Key ID. Defaults to env.APPLE_API_KEY_ID."
+    required: false
+    default: ${{ env.APPLE_API_KEY_ID }}
   apple_api_issuer_id:
-    description: "App Store Connect Issuer ID"
-    required: true
+    description: "App Store Connect Issuer ID. Defaults to env.APPLE_API_ISSUER_ID."
+    required: false
+    default: ${{ env.APPLE_API_ISSUER_ID }}
   apple_api_key_p8_base64:
-    description: "Base64-encoded App Store Connect API key (.p8)"
-    required: true
+    description: "Base64-encoded App Store Connect API key (.p8). Defaults to env.APPLE_API_KEY_P8_BASE64."
+    required: false
+    default: ${{ env.APPLE_API_KEY_P8_BASE64 }}
 
   # ── Build configuration ───────────────────────────────────────────────────
   ios_build_dir:
