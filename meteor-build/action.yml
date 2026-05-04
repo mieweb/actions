@@ -1,0 +1,30 @@
+name: "Meteor/Cordova Build"
+description: >
+  Composite action that runs `meteor build` for the given platform with a
+  configurable DDP server URL and output directory.
+
+inputs:
+  platform:
+    description: "Cordova platform to build (e.g. 'ios' or 'android')"
+    required: true
+  server:
+    description: "Meteor DDP server URL baked into the Cordova build"
+    required: true
+  output_dir:
+    description: "Output directory for the build"
+    required: false
+    default: "./ios-build"
+
+runs:
+  using: "composite"
+  steps:
+    - name: Build with Meteor/Cordova
+      shell: bash
+      env:
+        METEOR_PLATFORM: ${{ inputs.platform }}
+        METEOR_SERVER: ${{ inputs.server }}
+        METEOR_OUTPUT_DIR: ${{ inputs.output_dir }}
+      run: |
+        meteor build "$METEOR_OUTPUT_DIR" \
+          --platforms "$METEOR_PLATFORM" \
+          --server="$METEOR_SERVER"
