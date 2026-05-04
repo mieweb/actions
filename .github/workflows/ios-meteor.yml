@@ -40,7 +40,7 @@ on:
 
       # ── Customisation hook ──────────────────────────────────────────────────
       pre_build_script:
-        description: "Path to a shell script in the caller's repo to run before the Meteor build (e.g. scripts/setup-firebase.sh). Skipped if empty."
+        description: "Inline bash to run before the Meteor build (e.g. decode secrets, patch configs). Skipped if empty. Secrets can be interpolated by the caller."
         required: false
         type: string
         default: ""
@@ -72,7 +72,7 @@ jobs:
       - name: Run pre-build script
         if: inputs.pre_build_script != ''
         shell: bash
-        run: bash "${{ inputs.pre_build_script }}"
+        run: ${{ inputs.pre_build_script }}
 
       # ── 3. Meteor/Cordova iOS build ──────────────────────────────────────
       - name: Build iOS with Meteor/Cordova
