@@ -24,7 +24,20 @@ runs:
       env:
         XCODE_PATH: ${{ inputs.xcode_path }}
       run: |
-        sudo xcode-select -s "$XCODE_PATH/Contents/Developer"
+        # Use the requested Xcode if it exists; otherwise fall back to the
+        # latest Xcode 26.x, then to the newest stable Xcode on the runner.
+        if [ -d "$XCODE_PATH/Contents/Developer" ]; then
+          SELECTED="$XCODE_PATH"
+        else
+          echo "Requested Xcode not found at $XCODE_PATH — falling back."
+          SELECTED=$(ls -td /Applications/Xcode_26*.app 2>/dev/null | head -n 1 || true)
+          if [ -z "$SELECTED" ]; then
+            SELECTED=$(ls -td /Applications/Xcode*.app \
+              | grep -v -i -E '(beta|rc|gm|seed|preview)' | head -n 1)
+          fi
+        fi
+        echo "Selected Xcode: $SELECTED"
+        sudo xcode-select -s "$SELECTED/Contents/Developer"
         xcodebuild -version
 
     - name: Setup Node.js

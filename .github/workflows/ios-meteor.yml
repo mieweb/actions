@@ -4,6 +4,14 @@
 # Full pipeline: Setup → (optional pre-build hook) → Meteor build → CocoaPods
 #                → Fastlane sign/archive → TestFlight upload
 #
+# Use this workflow for the simple case (no custom pre-build steps needed).
+# For apps that need custom steps with secret access (Firebase decode,
+# config patching, asset generation, etc.), compose the actions directly:
+#   - mieweb/actions/setup-meteor@v1
+#   - <your custom steps with direct ${{ secrets.* }} access>
+#   - mieweb/actions/meteor-build@v1
+#   - mieweb/actions/ios@v1
+#
 # Callers use `secrets: inherit` — the workflow references secrets by
 # conventional names directly. No per-secret mapping needed.
 #
@@ -40,7 +48,7 @@ on:
 
       # ── Customisation hook ──────────────────────────────────────────────────
       pre_build_script:
-        description: "Path to a shell script in the caller's repo to run before the Meteor build (e.g. scripts/setup-firebase.sh). Skipped if empty."
+        description: "Inline bash to run before the Meteor build. Skipped if empty. For complex needs (custom secrets, multiple steps), compose the actions directly instead of using this workflow."
         required: false
         type: string
         default: ""
@@ -72,17 +80,14 @@ jobs:
       - name: Run pre-build script
         if: inputs.pre_build_script != ''
         shell: bash
-        run: bash "${{ inputs.pre_build_script }}"
+        run: ${{ inputs.pre_build_script }}
 
       # ── 3. Meteor/Cordova iOS build ──────────────────────────────────────
       - name: Build iOS with Meteor/Cordova
-        shell: bash
-        env:
-          METEOR_SERVER: ${{ inputs.meteor_server }}
-        run: |
-          meteor build ./ios-build \
-            --platforms ios \
-            --server="$METEOR_SERVER"
+        uses: mieweb/actions/meteor-build@v1
+        with:
+          platform: ios
+          server: ${{ inputs.meteor_server }}
 
       # ── 4. Fastlane: pod install + sign + archive + upload ───────────────
       - name: Build & upload iOS to TestFlight
