@@ -85,12 +85,13 @@ jobs:
     with:
       app_identifier: org.mieweb.os.dev
       meteor_server: https://app.example.com
-      pre_build_script: scripts/setup-firebase.sh
+      pre_build_script: |
+        bash scripts/setup-firebase.sh
 ```
 
-The `pre_build_script` runs after the environment is set up but before
-`meteor build`. Use it for any project-specific setup (Firebase configs,
-environment files, asset generation, etc.).
+The `pre_build_script` is inline bash that runs after the environment is set
+up but before `meteor build`. Use it for any project-specific setup
+(Firebase configs, environment files, asset generation, etc.).
 
 #### Workflow inputs
 
@@ -100,7 +101,7 @@ environment files, asset generation, etc.).
 | `meteor_server` | **yes** | — | Meteor DDP server URL |
 | `xcode_path` | | `/Applications/Xcode_26.app` | Absolute path to Xcode.app |
 | `node_version` | | `20` | Node.js version |
-| `pre_build_script` | | — | Path to a shell script in the caller's repo |
+| `pre_build_script` | | — | Inline bash to run before `meteor build` |
 | `signing_mode` | | `match` | `match` or `secrets` |
 | `upload_to_testflight` | | `true` | Upload IPA to TestFlight |
 
@@ -152,12 +153,14 @@ jobs:
     secrets: inherit
     with:
       app_identifier:   com.example.app
-      pre_build_script: scripts/setup-firebase.sh
+      pre_build_script: |
+        bash scripts/setup-firebase.sh
 ```
 
-The `pre_build_script` runs after JS deps are installed but **before** `expo
-prebuild`, so the script can place files (e.g. `GoogleService-Info.plist`)
-that the prebuild step picks up.
+The `pre_build_script` is inline bash that runs after JS deps are installed
+but **before** `expo prebuild`, so the script can place files (e.g.
+`GoogleService-Info.plist`) that the prebuild step picks up. The script's
+working directory is `working_directory` (defaults to repo root).
 
 #### Workflow inputs
 
@@ -168,7 +171,7 @@ that the prebuild step picks up.
 | `node_version` | | `20` | Node.js version |
 | `package_manager` | | `npm` | `npm` \| `yarn` \| `pnpm` |
 | `working_directory` | | `.` | Path to the Expo project (where `package.json` lives) |
-| `pre_build_script` | | — | Path to a shell script in the caller's repo |
+| `pre_build_script` | | — | Inline bash to run before `expo prebuild`, executed from `working_directory` |
 | `signing_mode` | | `match` | `match` or `secrets` |
 | `upload_to_testflight` | | `true` | Upload IPA to TestFlight |
 

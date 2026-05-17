@@ -8,6 +8,15 @@
 # app.json / app.config.js via `expo prebuild`. The caller's project must
 # have `expo` in its dependencies.
 #
+# Use this workflow for the simple case (no custom pre-build steps needed).
+# For apps that need custom steps with secret access (Firebase plist decode,
+# app.config.js patching, asset generation, etc.), compose the actions
+# directly:
+#   - mieweb/actions/setup-expo@v1
+#   - <your custom steps with direct ${{ secrets.* }} access>
+#   - run: npx expo prebuild --clean --platform ios --non-interactive
+#   - mieweb/actions/ios@v1   (with ios_build_dir: ios, run_pod_install: "true")
+#
 # Callers use `secrets: inherit` — the workflow references secrets by
 # conventional names directly. No per-secret mapping needed.
 #
@@ -52,7 +61,7 @@ on:
 
       # ── Customisation hook ──────────────────────────────────────────────────
       pre_build_script:
-        description: "Path to a shell script in the caller's repo to run before `expo prebuild` (e.g. scripts/setup-firebase.sh). Skipped if empty."
+        description: "Inline bash to run before `expo prebuild`. Skipped if empty. For complex needs (custom secrets, multiple steps), compose the actions directly instead of using this workflow."
         required: false
         type: string
         default: ""
@@ -86,7 +95,8 @@ jobs:
       - name: Run pre-build script
         if: inputs.pre_build_script != ''
         shell: bash
-        run: bash "${{ inputs.pre_build_script }}"
+        working-directory: ${{ inputs.working_directory }}
+        run: ${{ inputs.pre_build_script }}
 
       # ── 3. Expo prebuild (regenerate native ios/) ─────────────────────────
       - name: Expo prebuild
