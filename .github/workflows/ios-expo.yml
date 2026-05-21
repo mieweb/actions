@@ -1,0 +1,122 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# Reusable workflow: iOS Expo Build & Upload
+#
+# Full pipeline: Setup → (optional pre-build hook) → expo prebuild → CocoaPods
+#                → Fastlane sign/archive → TestFlight upload
+#
+# For Expo apps only. The native ios/ dir is regenerated each run from
+# app.json / app.config.js via `expo prebuild`. The caller's project must
+# have `expo` in its dependencies.
+#
+# Use this workflow for the simple case (no custom pre-build steps needed).
+# For apps that need custom steps with secret access (Firebase plist decode,
+# app.config.js patching, asset generation, etc.), compose the actions
+# directly:
+#   - mieweb/actions/setup-expo@v1
+#   - <your custom steps with direct ${{ secrets.* }} access>
+#   - run: npx expo prebuild --clean --platform ios --non-interactive
+#   - mieweb/actions/ios@v1   (with ios_build_dir: ios, run_pod_install: "true")
+#
+# Callers use `secrets: inherit` — the workflow references secrets by
+# conventional names directly. No per-secret mapping needed.
+#
+# Required secrets (org or repo level):
+#   APPLE_TEAM_ID, MATCH_GIT_BASIC_AUTHORIZATION, MATCH_PASSWORD,
+#   APPLE_API_KEY_ID, APPLE_API_ISSUER_ID, APPLE_API_KEY_P8_BASE64
+# ─────────────────────────────────────────────────────────────────────────────
+name: iOS Expo Build & Upload
+
+on:
+  workflow_call:
+    inputs:
+      # ── App identity ────────────────────────────────────────────────────────
+      app_identifier:
+        description: "Target iOS bundle ID (must match app.json / Info.plist)"
+        required: true
+        type: string
+
+      # ── Toolchain ───────────────────────────────────────────────────────────
+      xcode_path:
+        description: "Absolute path to Xcode.app"
+        required: false
+        type: string
+        default: "/Applications/Xcode_26.app"
+      node_version:
+        description: "Node.js version"
+        required: false
+        type: string
+        default: "20"
+      package_manager:
+        description: "Package manager: npm, yarn, or pnpm"
+        required: false
+        type: string
+        default: "npm"
+
+      # ── Project layout ──────────────────────────────────────────────────────
+      working_directory:
+        description: "Path to the Expo project (where package.json / app.json lives), relative to repo root"
+        required: false
+        type: string
+        default: "."
+
+      # ── Customisation hook ──────────────────────────────────────────────────
+      pre_build_script:
+        description: "Inline bash to run before `expo prebuild`. Skipped if empty. For complex needs (custom secrets, multiple steps), compose the actions directly instead of using this workflow."
+        required: false
+        type: string
+        default: ""
+
+      # ── Build configuration ─────────────────────────────────────────────────
+      signing_mode:
+        description: "'match' or 'secrets'"
+        required: false
+        type: string
+        default: "match"
+      upload_to_testflight:
+        description: "Upload IPA to TestFlight after building"
+        required: false
+        type: boolean
+        default: true
+
+jobs:
+  build:
+    runs-on: macos-latest
+    steps:
+      # ── 1. Checkout, Xcode, Node, JS deps ─────────────────────────────────
+      - name: Setup Expo environment
+        uses: mieweb/actions/setup-expo@v1
+        with:
+          xcode_path:        ${{ inputs.xcode_path }}
+          node_version:      ${{ inputs.node_version }}
+          package_manager:   ${{ inputs.package_manager }}
+          working_directory: ${{ inputs.working_directory }}
+
+      # ── 2. Pre-build hook (caller-provided script) ────────────────────────
+      - name: Run pre-build script
+        if: inputs.pre_build_script != ''
+        shell: bash
+        working-directory: ${{ inputs.working_directory }}
+        run: ${{ inputs.pre_build_script }}
+
+      # ── 3. Expo prebuild (regenerate native ios/) ─────────────────────────
+      - name: Expo prebuild
+        shell: bash
+        working-directory: ${{ inputs.working_directory }}
+        run: npx expo prebuild --clean --platform ios --non-interactive
+
+      # ── 4. Fastlane: pod install + sign + archive + upload ───────────────
+      - name: Build & upload iOS to TestFlight
+        uses: mieweb/actions/ios@v1
+        with:
+          app_identifier:                ${{ inputs.app_identifier }}
+          apple_team_id:                 ${{ secrets.APPLE_TEAM_ID }}
+          match_git_basic_authorization: ${{ secrets.MATCH_GIT_BASIC_AUTHORIZATION }}
+          match_password:                ${{ secrets.MATCH_PASSWORD }}
+          apple_api_key_id:              ${{ secrets.APPLE_API_KEY_ID }}
+          apple_api_issuer_id:           ${{ secrets.APPLE_API_ISSUER_ID }}
+          apple_api_key_p8_base64:       ${{ secrets.APPLE_API_KEY_P8_BASE64 }}
+          # Expo prebuild lands the workspace in <working_directory>/ios
+          ios_build_dir:                 ${{ inputs.working_directory == '.' && 'ios' || format('{0}/ios', inputs.working_directory) }}
+          signing_mode:                  ${{ inputs.signing_mode }}
+          run_pod_install:               "true"
+          upload_to_testflight:          ${{ inputs.upload_to_testflight }}

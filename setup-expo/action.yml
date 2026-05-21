@@ -1,0 +1,67 @@
+name: "Setup Expo Environment"
+description: >
+  Composite action that checks out the caller's repo, selects Xcode,
+  installs Node.js, and installs the Expo project's JS dependencies.
+
+inputs:
+  xcode_path:
+    description: "Absolute path to Xcode.app"
+    required: false
+    default: "/Applications/Xcode_26.app"
+  node_version:
+    description: "Node.js version"
+    required: false
+    default: "20"
+  package_manager:
+    description: "Package manager: npm, yarn, or pnpm"
+    required: false
+    default: "npm"
+  working_directory:
+    description: "Path to the Expo project (where package.json lives), relative to repo root"
+    required: false
+    default: "."
+
+runs:
+  using: "composite"
+  steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+
+    - name: Select Xcode
+      shell: bash
+      env:
+        XCODE_PATH: ${{ inputs.xcode_path }}
+      run: |
+        # Use the requested Xcode if it exists; otherwise fall back to the
+        # latest Xcode 26.x, then to the newest stable Xcode on the runner.
+        if [ -d "$XCODE_PATH/Contents/Developer" ]; then
+          SELECTED="$XCODE_PATH"
+        else
+          echo "Requested Xcode not found at $XCODE_PATH — falling back."
+          SELECTED=$(ls -td /Applications/Xcode_26*.app 2>/dev/null | head -n 1 || true)
+          if [ -z "$SELECTED" ]; then
+            SELECTED=$(ls -td /Applications/Xcode*.app \
+              | grep -v -i -E '(beta|rc|gm|seed|preview)' | head -n 1)
+          fi
+        fi
+        echo "Selected Xcode: $SELECTED"
+        sudo xcode-select -s "$SELECTED/Contents/Developer"
+        xcodebuild -version
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ inputs.node_version }}
+
+    - name: Install JS dependencies
+      shell: bash
+      working-directory: ${{ inputs.working_directory }}
+      env:
+        PM: ${{ inputs.package_manager }}
+      run: |
+        case "$PM" in
+          npm)  npm ci ;;
+          yarn) corepack enable && yarn install --frozen-lockfile ;;
+          pnpm) corepack enable && pnpm install --frozen-lockfile ;;
+          *)    echo "::error::Unsupported package_manager: $PM"; exit 1 ;;
+        esac
