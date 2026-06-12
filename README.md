@@ -53,10 +53,30 @@ jobs:
 
 That's the whole thing. Push, and TestFlight gets a build.
 
+## Required secrets
+
+Store these at the **GitHub org level** so every repo inherits them via
+`secrets: inherit` (see [Org-level secrets](#org-level-secrets-recommended)).
+The four App Store Connect secrets are always required; the signing secrets
+depend on which `signing_mode` you use.
+
+| Secret | Required | Used by | Description |
+|---|---|---|---|
+| `APPLE_TEAM_ID` | **always** | all | Apple Developer Team ID |
+| `APPLE_API_KEY_ID` | **always** | all | App Store Connect API Key ID |
+| `APPLE_API_ISSUER_ID` | **always** | all | App Store Connect Issuer ID |
+| `APPLE_API_KEY_P8_BASE64` | **always** | all | Base64-encoded App Store Connect API key (`.p8`) |
+| `MATCH_GIT_BASIC_AUTHORIZATION` | `match` mode | signing | Base64 `user:token` for the match signing repo |
+| `MATCH_PASSWORD` | `match` mode | signing | Encryption passphrase for match-stored certs/profiles |
+| `IOS_DIST_CERT_P12_BASE64` | `secrets` mode | signing | Base64-encoded distribution certificate (`.p12`) |
+| `IOS_DIST_CERT_PASSWORD` | `secrets` mode | signing | Password for the `.p12` certificate |
+| `IOS_PROVISIONING_PROFILE_BASE64` | `secrets` mode | signing | Base64-encoded provisioning profile (`.mobileprovision`) |
+
 ## Table of contents
 
 | Topic | Type | Why use it |
 |---|---|---|
+| [Required secrets](#required-secrets) | Guidance | The secrets every pipeline needs, and which signing mode requires which. |
 | [`setup-meteor`](#setup-meteor--composite-action) | Composite action | Prepare a Meteor/Cordova build environment (Xcode, Node, Meteor, npm install) before building. |
 | [`setup-expo`](#setup-expo--composite-action) | Composite action | Prepare an Expo build environment (Xcode, Node, JS deps) before `expo prebuild`. |
 | [`ios`](#ios--composite-action) | Composite action | Sign, archive, and optionally upload an iOS app to TestFlight. Use directly for bare React Native or custom pipelines. |
@@ -191,8 +211,9 @@ up but before `meteor build`. Use it for any project-specific setup
 
 #### Required secrets (org or repo level)
 
-`APPLE_TEAM_ID`, `MATCH_GIT_BASIC_AUTHORIZATION`, `MATCH_PASSWORD`,
-`APPLE_API_KEY_ID`, `APPLE_API_ISSUER_ID`, `APPLE_API_KEY_P8_BASE64`
+See [Required secrets](#required-secrets). Match mode (the default) needs the
+four always-required secrets plus `MATCH_GIT_BASIC_AUTHORIZATION` and
+`MATCH_PASSWORD`.
 
 ### `ios-expo.yml` — Reusable workflow
 
@@ -261,11 +282,9 @@ working directory is `working_directory` (defaults to repo root).
 
 #### Required secrets (org or repo level)
 
-`APPLE_TEAM_ID`, `APPLE_API_KEY_ID`, `APPLE_API_ISSUER_ID`,
-`APPLE_API_KEY_P8_BASE64`, plus the match-mode pair
-(`MATCH_GIT_BASIC_AUTHORIZATION`, `MATCH_PASSWORD`) or the secrets-mode trio
-(`IOS_DIST_CERT_P12_BASE64`, `IOS_DIST_CERT_PASSWORD`,
-`IOS_PROVISIONING_PROFILE_BASE64`).
+See [Required secrets](#required-secrets). The four always-required App Store
+Connect secrets, plus either the `match`-mode pair or the `secrets`-mode trio
+depending on your `signing_mode`.
 
 ## Org-level secrets (recommended)
 
