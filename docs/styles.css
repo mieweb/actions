@@ -1,16 +1,22 @@
+/*
+ * Colors come from MIE Web brand tokens (--mieweb-*), loaded via
+ * @mieweb/ui/brands/mieweb.css in index.html. We only alias them here so the
+ * rest of the stylesheet stays readable. No brand hex values are hardcoded —
+ * if MIE rebrands, this page follows automatically.
+ */
 :root {
-  --bg: #0b0f1a;
-  --bg-soft: #111726;
-  --card: #151c2e;
-  --card-hover: #1a2334;
-  --border: #243049;
-  --text: #e7ecf5;
-  --muted: #9aa6bd;
-  --accent: #6ea8fe;
-  --accent-2: #b388ff;
-  --green: #57d9a3;
-  --code-bg: #0d1322;
-  --radius: 14px;
+  --bg: var(--mieweb-background);
+  --bg-soft: var(--mieweb-card);
+  --card: var(--mieweb-card);
+  --card-hover: var(--mieweb-muted);
+  --border: var(--mieweb-border);
+  --text: var(--mieweb-foreground);
+  --muted: var(--mieweb-muted-foreground);
+  --accent: var(--mieweb-primary-500);
+  --accent-2: var(--mieweb-primary-300);
+  --green: var(--mieweb-success);
+  --code-bg: #0d0f0e;
+  --radius: var(--mieweb-radius-lg);
 }
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -35,8 +41,8 @@ a:hover { text-decoration: underline; }
 /* ── Hero ─────────────────────────────────────────────── */
 .hero {
   background:
-    radial-gradient(1100px 480px at 75% -10%, rgba(110, 168, 254, 0.18), transparent 60%),
-    radial-gradient(900px 420px at 10% 0%, rgba(179, 136, 255, 0.14), transparent 55%),
+    radial-gradient(1100px 480px at 75% -10%, color-mix(in srgb, var(--accent) 22%, transparent), transparent 60%),
+    radial-gradient(900px 420px at 10% 0%, color-mix(in srgb, var(--accent-2) 14%, transparent), transparent 55%),
     var(--bg);
   border-bottom: 1px solid var(--border);
   padding-bottom: 5rem;
@@ -119,8 +125,8 @@ h1 {
   transition: transform 0.12s ease, background 0.12s ease, border-color 0.12s ease;
 }
 .btn:hover { text-decoration: none; transform: translateY(-1px); }
-.btn-primary { background: var(--accent); color: #0b0f1a; }
-.btn-primary:hover { background: #8bbcff; }
+.btn-primary { background: var(--accent); color: #ffffff; }
+.btn-primary:hover { background: var(--mieweb-primary-600); }
 .btn-ghost { border: 1px solid var(--border); color: var(--text); }
 .btn-ghost:hover { border-color: var(--accent); }
 
@@ -191,8 +197,8 @@ h1 {
   font-size: 0.88em;
 }
 .card-accent {
-  background: linear-gradient(160deg, rgba(110, 168, 254, 0.14), rgba(179, 136, 255, 0.12));
-  border-color: rgba(110, 168, 254, 0.4);
+  background: linear-gradient(160deg, color-mix(in srgb, var(--accent) 18%, transparent), color-mix(in srgb, var(--accent-2) 10%, transparent));
+  border-color: color-mix(in srgb, var(--accent) 40%, transparent);
 }
 .card-accent h3 { color: var(--text); }
 
@@ -227,8 +233,8 @@ h1 {
   padding: 0.25rem 0.6rem;
   border-radius: 999px;
 }
-.tag-action { background: rgba(110, 168, 254, 0.16); color: var(--accent); }
-.tag-flow { background: rgba(179, 136, 255, 0.16); color: var(--accent-2); }
+.tag-action { background: color-mix(in srgb, var(--accent) 16%, transparent); color: var(--accent); }
+.tag-flow { background: color-mix(in srgb, var(--accent-2) 16%, transparent); color: var(--accent-2); }
 
 /* ── Quick start ──────────────────────────────────────── */
 .qs {
@@ -251,7 +257,7 @@ h1 {
   height: 2.2rem;
   border-radius: 50%;
   background: linear-gradient(135deg, var(--accent), var(--accent-2));
-  color: #0b0f1a;
+  color: #ffffff;
   font-weight: 700;
   display: grid;
   place-items: center;
