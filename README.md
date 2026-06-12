@@ -5,6 +5,18 @@ Reusable composite GitHub Actions and workflows for mieweb CI/CD pipelines.
 Any developer in the mieweb org can call these from their caller workflow —
 use `secrets: inherit` and pass the required inputs.
 
+## Table of contents
+
+| Topic | Type | Why use it |
+|---|---|---|
+| [`setup-meteor`](#setup-meteor--composite-action) | Composite action | Prepare a Meteor/Cordova build environment (Xcode, Node, Meteor, npm install) before building. |
+| [`setup-expo`](#setup-expo--composite-action) | Composite action | Prepare an Expo build environment (Xcode, Node, JS deps) before `expo prebuild`. |
+| [`ios`](#ios--composite-action) | Composite action | Sign, archive, and optionally upload an iOS app to TestFlight. Use directly for bare React Native or custom pipelines. |
+| [`ios-meteor.yml`](#ios-meteoryml--reusable-workflow) | Reusable workflow | One-call end-to-end pipeline for Meteor/Cordova iOS apps. |
+| [`ios-expo.yml`](#ios-expoyml--reusable-workflow) | Reusable workflow | One-call end-to-end pipeline for Expo iOS apps. |
+| [Org-level secrets](#org-level-secrets-recommended) | Guidance | Where to store shared signing secrets so every repo inherits them. |
+| [Important notes](#important-notes) | Guidance | Gotchas to know before calling the `ios` action directly. |
+
 ## Components
 
 ### `setup-meteor` — Composite action
@@ -57,6 +69,30 @@ Supports two code-signing strategies.
     apple_api_issuer_id: ${{ secrets.APPLE_API_ISSUER_ID }}
     apple_api_key_p8_base64: ${{ secrets.APPLE_API_KEY_P8_BASE64 }}
 ```
+
+#### Inputs
+
+| Input | Required | Default | Description |
+|---|---|---|---|
+| `signing_mode` | | `match` | `match` or `secrets` |
+| `app_identifier` | **yes** | — | Bundle ID |
+| `apple_team_id` | **yes** | — | Apple Developer Team ID |
+| `match_git_url` | if match | `https://github.com/mieweb/mobile-signing` | Match signing repo URL |
+| `match_git_basic_authorization` | if match | — | Base64 `user:token` for the signing repo |
+| `match_password` | if match | — | Encryption passphrase for match |
+| `match_type` | | `appstore` | Match profile type |
+| `match_readonly` | | `true` | Never create/renew certs in CI |
+| `ios_cert_p12_base64` | if secrets | — | Base64 distribution cert (.p12) |
+| `ios_cert_password` | if secrets | — | Password for the .p12 |
+| `ios_prov_profile_base64` | if secrets | — | Base64 provisioning profile |
+| `apple_api_key_id` | **yes** | — | App Store Connect API Key ID |
+| `apple_api_issuer_id` | **yes** | — | App Store Connect Issuer ID |
+| `apple_api_key_p8_base64` | **yes** | — | Base64 API key (.p8) |
+| `workspace_path` | | auto-discovered | Path to `.xcworkspace` |
+| `xcode_scheme` | | auto-discovered | Xcode scheme name |
+| `run_pod_install` | | `false` | Run `pod install` before Fastlane (set `true` for Cordova) |
+| `upload_to_testflight` | | `true` | Upload IPA to TestFlight. Set `false` to stop after producing a signed IPA (no upload). |
+| `ruby_version` | | `3.4` | Ruby version for Fastlane |
 
 ### `ios-meteor.yml` — Reusable workflow
 
@@ -182,30 +218,6 @@ working directory is `working_directory` (defaults to repo root).
 (`MATCH_GIT_BASIC_AUTHORIZATION`, `MATCH_PASSWORD`) or the secrets-mode trio
 (`IOS_DIST_CERT_P12_BASE64`, `IOS_DIST_CERT_PASSWORD`,
 `IOS_PROVISIONING_PROFILE_BASE64`).
-
-### `ios` action inputs
-
-| Input | Required | Default | Description |
-|---|---|---|---|
-| `signing_mode` | | `match` | `match` or `secrets` |
-| `app_identifier` | **yes** | — | Bundle ID |
-| `apple_team_id` | **yes** | — | Apple Developer Team ID |
-| `match_git_url` | if match | `https://github.com/mieweb/mobile-signing` | Match signing repo URL |
-| `match_git_basic_authorization` | if match | — | Base64 `user:token` for the signing repo |
-| `match_password` | if match | — | Encryption passphrase for match |
-| `match_type` | | `appstore` | Match profile type |
-| `match_readonly` | | `true` | Never create/renew certs in CI |
-| `ios_cert_p12_base64` | if secrets | — | Base64 distribution cert (.p12) |
-| `ios_cert_password` | if secrets | — | Password for the .p12 |
-| `ios_prov_profile_base64` | if secrets | — | Base64 provisioning profile |
-| `apple_api_key_id` | **yes** | — | App Store Connect API Key ID |
-| `apple_api_issuer_id` | **yes** | — | App Store Connect Issuer ID |
-| `apple_api_key_p8_base64` | **yes** | — | Base64 API key (.p8) |
-| `workspace_path` | | auto-discovered | Path to `.xcworkspace` |
-| `xcode_scheme` | | auto-discovered | Xcode scheme name |
-| `run_pod_install` | | `false` | Run `pod install` before Fastlane (set `true` for Cordova) |
-| `upload_to_testflight` | | `true` | Upload IPA to TestFlight |
-| `ruby_version` | | `3.4` | Ruby version for Fastlane |
 
 ## Org-level secrets (recommended)
 
