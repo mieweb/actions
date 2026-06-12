@@ -2,8 +2,56 @@
 
 Reusable composite GitHub Actions and workflows for mieweb CI/CD pipelines.
 
+📄 **Docs site:** https://mieweb.github.io/actions
+
 Any developer in the mieweb org can call these from their caller workflow —
 use `secrets: inherit` and pass the required inputs.
+
+## Why use this (the pain it removes)
+
+Shipping an iOS app from CI is deceptively hard. The build is the easy part —
+the pain is everything around it. If you've ever set up iOS CI from scratch,
+you've lost days to some of these:
+
+- **Code signing is a black hole.** Certificates, provisioning profiles,
+  keychains, the Apple Developer portal, `.p12` exports, `.mobileprovision`
+  files, App Store Connect API keys — get one wrong and you get a cryptic
+  `No signing certificate "iOS Distribution" found` after a 20-minute build.
+- **Secrets are everywhere and copied everywhere.** Every repo re-pastes the
+  same base64 cert, team ID, and API key into its own GitHub secrets. Rotate a
+  cert and you're editing ten repos by hand.
+- **Every project reinvents the same 150 lines of YAML.** Xcode selection,
+  Node + Meteor/Expo setup, `pod install`, Fastlane, archive, export,
+  TestFlight upload — copy-pasted between repos, then drifting out of sync the
+  moment one of them gets a fix the others never receive.
+- **It "works on my machine."** Local builds sign fine; CI fails because the
+  runner has no keychain, no certs, and a different Xcode. Debugging means
+  pushing commit after commit and waiting on a macOS runner each time.
+- **Fastlane, Ruby, and CocoaPods are a setup tax.** Pinning Ruby versions,
+  bundler caching, gem installs, Cordova pod quirks — all incidental work that
+  has nothing to do with your app.
+
+These actions absorb all of that. Signing is centralized (use `match` to share
+one identity across repos, or `secrets` for a one-off), secrets live once at the
+org level and are inherited, and the whole setup → build → sign → upload
+pipeline is a single `uses:` line that every repo gets fixes for at once.
+
+**Before** — every repo owns ~150 lines of fragile, drifting YAML and its own
+copy of the signing secrets.
+
+**After:**
+
+```yaml
+jobs:
+  ios:
+    uses: mieweb/actions/.github/workflows/ios-meteor.yml@v1
+    secrets: inherit
+    with:
+      app_identifier: org.mieweb.os.dev
+      meteor_server: https://app.example.com
+```
+
+That's the whole thing. Push, and TestFlight gets a build.
 
 ## Table of contents
 
