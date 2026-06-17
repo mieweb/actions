@@ -1,0 +1,2 @@
+# All values injected by the composite action via ENV — nothing hardcoded
+package_name(ENV["APP_IDENTIFIER"])

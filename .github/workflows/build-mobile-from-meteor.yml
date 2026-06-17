@@ -1,0 +1,137 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# Reusable workflow: Unified Mobile Build from Meteor (iOS + Android)
+#
+# Orchestrates the iOS and Android Meteor/Cordova pipelines in parallel from a
+# single caller. Choose `platforms: ios | android | both`.
+#
+# This workflow is deliberately CHANNEL-AGNOSTIC: it just builds, signs, and
+# publishes for the inputs it is given. Release-channel routing (beta vs
+# production vs experimental) belongs in the CALLER, which decides the app
+# identifier, server, and Play track per channel and passes them in.
+#
+# Callers use `secrets: inherit`; the nested workflows reference the
+# conventional secret names directly.
+#
+# Required secrets (org or repo level):
+#   iOS:     APPLE_TEAM_ID, APPLE_API_KEY_ID, APPLE_API_ISSUER_ID,
+#            APPLE_API_KEY_P8_BASE64, plus the match- or secrets-mode signing set
+#   Android: ANDROID_KEYSTORE_BASE64, ANDROID_KEYSTORE_PASSWORD,
+#            ANDROID_KEY_ALIAS, ANDROID_KEY_PASSWORD, GOOGLE_PLAY_JSON_KEY_BASE64
+#   Optional: GOOGLE_SERVICES_BASE64
+# ─────────────────────────────────────────────────────────────────────────────
+name: Mobile Build from Meteor (iOS + Android)
+
+on:
+  workflow_call:
+    inputs:
+      # ── Platform selection ──────────────────────────────────────────────────
+      platforms:
+        description: "Which platforms to build: 'ios', 'android', or 'both'"
+        required: false
+        type: string
+        default: "both"
+
+      # ── Shared ──────────────────────────────────────────────────────────────
+      meteor_server:
+        description: "Meteor DDP server URL baked into the Cordova build"
+        required: true
+        type: string
+      node_version:
+        description: "Node.js version"
+        required: false
+        type: string
+        default: "20"
+      pre_build_script:
+        description: "Inline bash to run before the Meteor build. Skipped if empty."
+        required: false
+        type: string
+        default: ""
+
+      # ── iOS ─────────────────────────────────────────────────────────────────
+      ios_app_identifier:
+        description: "iOS bundle ID (e.g. org.mieweb.os.dev). Required when building iOS."
+        required: false
+        type: string
+        default: ""
+      xcode_path:
+        description: "Absolute path to Xcode.app"
+        required: false
+        type: string
+        default: "/Applications/Xcode_26.app"
+      ios_signing_mode:
+        description: "iOS signing: 'match' or 'secrets'"
+        required: false
+        type: string
+        default: "match"
+      upload_to_testflight:
+        description: "Upload IPA to TestFlight"
+        required: false
+        type: boolean
+        default: true
+
+      # ── Android ─────────────────────────────────────────────────────────────
+      android_app_identifier:
+        description: "Android applicationId (e.g. com.bluehive.ozwell). Required when building Android."
+        required: false
+        type: string
+        default: ""
+      java_version:
+        description: "JDK version for the Android/Gradle build"
+        required: false
+        type: string
+        default: "17"
+      android_signing_method:
+        description: "Android signing: 'direct-keystore' or 'fastlane'"
+        required: false
+        type: string
+        default: "direct-keystore"
+      android_build_type:
+        description: "Android artifact: 'bundle' (AAB) or 'apk'"
+        required: false
+        type: string
+        default: "bundle"
+      upload_to_play:
+        description: "Upload the signed AAB to Google Play"
+        required: false
+        type: boolean
+        default: true
+      play_track:
+        description: "Play track: internal | alpha | beta | production"
+        required: false
+        type: string
+        default: "internal"
+      rollout_fraction:
+        description: "Android staged rollout fraction (e.g. '0.1'). Empty = full release."
+        required: false
+        type: string
+        default: ""
+
+jobs:
+  ios:
+    if: inputs.platforms == 'ios' || inputs.platforms == 'both'
+    uses: mieweb/actions/.github/workflows/build-ios-from-meteor.yml@v2
+    secrets: inherit
+    with:
+      app_identifier:       ${{ inputs.ios_app_identifier }}
+      meteor_server:        ${{ inputs.meteor_server }}
+      xcode_path:           ${{ inputs.xcode_path }}
+      node_version:         ${{ inputs.node_version }}
+      pre_build_script:     ${{ inputs.pre_build_script }}
+      signing_mode:         ${{ inputs.ios_signing_mode }}
+      upload_to_testflight: ${{ inputs.upload_to_testflight }}
+
+  android:
+    if: inputs.platforms == 'android' || inputs.platforms == 'both'
+    uses: mieweb/actions/.github/workflows/build-android-from-meteor.yml@v2
+    secrets: inherit
+    with:
+      app_identifier:   ${{ inputs.android_app_identifier }}
+      meteor_server:    ${{ inputs.meteor_server }}
+      node_version:     ${{ inputs.node_version }}
+      java_version:     ${{ inputs.java_version }}
+      pre_build_script: ${{ inputs.pre_build_script }}
+      signing_method:   ${{ inputs.android_signing_method }}
+      build_type:       ${{ inputs.android_build_type }}
+      upload_to_play:   ${{ inputs.upload_to_play }}
+      play_track:       ${{ inputs.play_track }}
+      rollout_fraction: ${{ inputs.rollout_fraction }}

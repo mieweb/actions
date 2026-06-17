@@ -7,10 +7,10 @@
 # Use this workflow for the simple case (no custom pre-build steps needed).
 # For apps that need custom steps with secret access (Firebase decode,
 # config patching, asset generation, etc.), compose the actions directly:
-#   - mieweb/actions/setup-meteor@v1
+#   - mieweb/actions/prepare-meteor-cordova-env@v2
 #   - <your custom steps with direct ${{ secrets.* }} access>
-#   - mieweb/actions/meteor-build@v1
-#   - mieweb/actions/ios@v1
+#   - mieweb/actions/run-meteor-build@v2
+#   - mieweb/actions/sign-archive-upload-ios@v2
 #
 # Callers use `secrets: inherit` — the workflow references secrets by
 # conventional names directly. No per-secret mapping needed.
@@ -71,7 +71,7 @@ jobs:
     steps:
       # ── 1. Checkout, Xcode, Node, Meteor ──────────────────────────────────
       - name: Setup Meteor environment
-        uses: mieweb/actions/setup-meteor@v1
+        uses: mieweb/actions/prepare-meteor-cordova-env@v2
         with:
           xcode_path:   ${{ inputs.xcode_path }}
           node_version: ${{ inputs.node_version }}
@@ -84,14 +84,14 @@ jobs:
 
       # ── 3. Meteor/Cordova iOS build ──────────────────────────────────────
       - name: Build iOS with Meteor/Cordova
-        uses: mieweb/actions/meteor-build@v1
+        uses: mieweb/actions/run-meteor-build@v2
         with:
           platform: ios
           server: ${{ inputs.meteor_server }}
 
       # ── 4. Fastlane: pod install + sign + archive + upload ───────────────
       - name: Build & upload iOS to TestFlight
-        uses: mieweb/actions/ios@v1
+        uses: mieweb/actions/sign-archive-upload-ios@v2
         with:
           app_identifier:              ${{ inputs.app_identifier }}
           apple_team_id:               ${{ secrets.APPLE_TEAM_ID }}

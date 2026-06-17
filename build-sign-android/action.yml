@@ -1,0 +1,157 @@
+name: "Build & Sign Android App"
+description: >
+  Composite action that builds and signs an Android app (AAB or APK) from a
+  Cordova/Gradle project. Supports two signing strategies: `direct-keystore`
+  (decode a keystore from GitHub secrets and sign via Gradle) and `fastlane`
+  (delegate to the bundled Fastlane lane). Mirrors the iOS action's
+  match/secrets split.
+
+inputs:
+  # ── Mode ──────────────────────────────────────────────────────────────────
+  signing_method:
+    description: "Signing strategy: 'direct-keystore' (keystore from secrets) or 'fastlane'"
+    required: false
+    default: "direct-keystore"
+
+  # ── App identity ──────────────────────────────────────────────────────────
+  app_identifier:
+    description: "Android applicationId (e.g. com.bluehive.ozwell)"
+    required: true
+
+  # ── Build configuration ───────────────────────────────────────────────────
+  android_build_dir:
+    description: "Directory containing the Cordova/Gradle Android project output. The action auto-discovers the Gradle wrapper inside it."
+    required: false
+    default: "android-build"
+  project_dir:
+    description: "Override: explicit path to the Gradle project root (skips auto-discovery)"
+    required: false
+  build_type:
+    description: "Artifact to produce: 'bundle' (AAB) or 'apk'"
+    required: false
+    default: "bundle"
+  google_services_base64:
+    description: "Base64-encoded google-services.json written into the project before building (optional)"
+    required: false
+
+  # ── Direct-keystore inputs (ignored when signing_method=fastlane) ─────────
+  keystore_base64:
+    description: "Base64-encoded Android keystore (.jks / .keystore)"
+    required: false
+  keystore_password:
+    description: "Keystore password"
+    required: false
+  key_alias:
+    description: "Signing key alias"
+    required: false
+  key_password:
+    description: "Signing key password"
+    required: false
+
+  # ── Fastlane-mode inputs (ignored when signing_method=direct-keystore) ────
+  ruby_version:
+    description: "Ruby version for Fastlane"
+    required: false
+    default: "3.4"
+  setup_ruby:
+    description: "Install Ruby + bundle gems (set false if caller already did)"
+    required: false
+    default: "true"
+
+outputs:
+  signed_artifact_path:
+    description: "Absolute path to the signed .aab/.apk produced by the build"
+    value: ${{ steps.collect.outputs.artifact_path }}
+
+runs:
+  using: "composite"
+  steps:
+    # ── 1. Ruby + Fastlane gems (fastlane mode only) ────────────────────────
+    - name: Setup Ruby and install Fastlane
+      if: inputs.signing_method == 'fastlane' && inputs.setup_ruby == 'true'
+      uses: ruby/setup-ruby@v1
+      with:
+        ruby-version: ${{ inputs.ruby_version }}
+        bundler-cache: true
+        working-directory: ${{ github.action_path }}
+
+    # ── 2. Resolve the Gradle project root ──────────────────────────────────
+    - name: Resolve Gradle project
+      id: discover
+      shell: bash
+      env:
+        GITHUB_WORKSPACE: ${{ github.workspace }}
+        ANDROID_BUILD_DIR: ${{ inputs.android_build_dir }}
+        PROJECT_DIR_OVERRIDE: ${{ inputs.project_dir }}
+      run: |
+        if [[ -n "$PROJECT_DIR_OVERRIDE" ]]; then
+          PROJECT_DIR="$PROJECT_DIR_OVERRIDE"
+        else
+          SEARCH_DIR="${GITHUB_WORKSPACE}/${ANDROID_BUILD_DIR}"
+          GRADLEW=$(find "$SEARCH_DIR" -name "gradlew" -type f | head -1)
+          if [[ -z "$GRADLEW" ]]; then
+            echo "::error::No gradlew found under ${SEARCH_DIR}"
+            exit 1
+          fi
+          PROJECT_DIR=$(dirname "$GRADLEW")
+        fi
+        echo "project_dir=$PROJECT_DIR" >> "$GITHUB_OUTPUT"
+        echo "Resolved Gradle project: $PROJECT_DIR"
+
+    # ── 3. Optional google-services.json ────────────────────────────────────
+    - name: Write google-services.json
+      if: inputs.google_services_base64 != ''
+      shell: bash
+      env:
+        GOOGLE_SERVICES_BASE64: ${{ inputs.google_services_base64 }}
+        PROJECT_DIR: ${{ steps.discover.outputs.project_dir }}
+      run: |
+        echo "$GOOGLE_SERVICES_BASE64" | base64 --decode > "${PROJECT_DIR}/app/google-services.json"
+        echo "Wrote google-services.json to ${PROJECT_DIR}/app"
+
+    # ── 4a. Direct-keystore: build + sign via Gradle ────────────────────────
+    - name: Build & sign (direct-keystore)
+      if: inputs.signing_method == 'direct-keystore'
+      id: build_direct
+      shell: bash
+      working-directory: ${{ github.action_path }}
+      env:
+        PROJECT_DIR:        ${{ steps.discover.outputs.project_dir }}
+        BUILD_TYPE:         ${{ inputs.build_type }}
+        KEYSTORE_BASE64:    ${{ inputs.keystore_base64 }}
+        KEYSTORE_PASSWORD:  ${{ inputs.keystore_password }}
+        KEY_ALIAS:          ${{ inputs.key_alias }}
+        KEY_PASSWORD:       ${{ inputs.key_password }}
+      run: bash scripts/sign-android-bundle.sh
+
+    # ── 4b. Fastlane: delegate to bundled lane ──────────────────────────────
+    - name: Build & sign (fastlane)
+      if: inputs.signing_method == 'fastlane'
+      id: build_fastlane
+      shell: bash
+      working-directory: ${{ github.action_path }}
+      env:
+        APP_IDENTIFIER:     ${{ inputs.app_identifier }}
+        PROJECT_DIR:        ${{ steps.discover.outputs.project_dir }}
+        BUILD_TYPE:         ${{ inputs.build_type }}
+        KEYSTORE_BASE64:    ${{ inputs.keystore_base64 }}
+        KEYSTORE_PASSWORD:  ${{ inputs.keystore_password }}
+        KEY_ALIAS:          ${{ inputs.key_alias }}
+        KEY_PASSWORD:       ${{ inputs.key_password }}
+        FASTLANE_SKIP_UPDATE_CHECK: "1"
+        FASTLANE_DISABLE_COLORS:    "1"
+      run: bundle exec fastlane android build_signed_bundle
+
+    # ── 5. Collect the produced artifact path ───────────────────────────────
+    - name: Collect artifact path
+      id: collect
+      shell: bash
+      env:
+        ARTIFACT_PATH: ${{ steps.build_direct.outputs.artifact_path || steps.build_fastlane.outputs.artifact_path }}
+      run: |
+        if [[ -z "$ARTIFACT_PATH" ]]; then
+          echo "::error::No signed artifact path was produced"
+          exit 1
+        fi
+        echo "artifact_path=$ARTIFACT_PATH" >> "$GITHUB_OUTPUT"
+        echo "Signed artifact: $ARTIFACT_PATH"

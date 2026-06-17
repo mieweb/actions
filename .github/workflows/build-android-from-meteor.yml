@@ -1,0 +1,160 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# Reusable workflow: Android Meteor/Cordova Build, Sign & Publish
+#
+# Full pipeline: Setup → (optional pre-build hook) → Meteor build (android)
+#                → Gradle sign (AAB/APK) → optional Google Play upload
+#
+# Use this workflow for the simple case (no custom pre-build steps needed).
+# For apps that need custom steps with secret access (Firebase decode,
+# config patching, asset generation, etc.), compose the actions directly:
+#   - mieweb/actions/prepare-android-env@v2
+#   - <your custom steps with direct ${{ secrets.* }} access>
+#   - mieweb/actions/run-meteor-build@v2   (with platform: android)
+#   - mieweb/actions/build-sign-android@v2
+#   - mieweb/actions/publish-android-to-play@v2
+#
+# Callers use `secrets: inherit` — the workflow references secrets by
+# conventional names directly. No per-secret mapping needed.
+#
+# Required secrets (org or repo level):
+#   direct-keystore signing:
+#     ANDROID_KEYSTORE_BASE64, ANDROID_KEYSTORE_PASSWORD,
+#     ANDROID_KEY_ALIAS, ANDROID_KEY_PASSWORD
+#   publishing:
+#     GOOGLE_PLAY_JSON_KEY_BASE64
+#   optional:
+#     GOOGLE_SERVICES_BASE64
+# ─────────────────────────────────────────────────────────────────────────────
+name: Android Meteor/Cordova Build, Sign & Publish
+
+on:
+  workflow_call:
+    inputs:
+      # ── App identity ────────────────────────────────────────────────────────
+      app_identifier:
+        description: "Android applicationId (e.g. com.bluehive.ozwell)"
+        required: true
+        type: string
+      meteor_server:
+        description: "Meteor DDP server URL baked into the Cordova build"
+        required: true
+        type: string
+
+      # ── Toolchain ───────────────────────────────────────────────────────────
+      node_version:
+        description: "Node.js version"
+        required: false
+        type: string
+        default: "20"
+      java_version:
+        description: "JDK version for the Android/Gradle build"
+        required: false
+        type: string
+        default: "17"
+      android_api_level:
+        description: "Android SDK platform API level"
+        required: false
+        type: string
+        default: "34"
+      android_build_tools:
+        description: "Android SDK build-tools version"
+        required: false
+        type: string
+        default: "35.0.0"
+
+      # ── Customisation hook ──────────────────────────────────────────────────
+      pre_build_script:
+        description: "Inline bash to run before the Meteor build. Skipped if empty."
+        required: false
+        type: string
+        default: ""
+
+      # ── Build configuration ─────────────────────────────────────────────────
+      signing_method:
+        description: "'direct-keystore' or 'fastlane'"
+        required: false
+        type: string
+        default: "direct-keystore"
+      build_type:
+        description: "'bundle' (AAB) or 'apk'"
+        required: false
+        type: string
+        default: "bundle"
+
+      # ── Publishing ──────────────────────────────────────────────────────────
+      upload_to_play:
+        description: "Upload the signed AAB to Google Play after building"
+        required: false
+        type: boolean
+        default: true
+      play_track:
+        description: "Play track: internal | alpha | beta | production"
+        required: false
+        type: string
+        default: "internal"
+      rollout_fraction:
+        description: "Staged rollout fraction (e.g. '0.1'). Empty = full release."
+        required: false
+        type: string
+        default: ""
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      # ── 1. Checkout, JDK, Node, Android SDK, Meteor ───────────────────────
+      - name: Setup Android environment
+        uses: mieweb/actions/prepare-android-env@v2
+        with:
+          java_version:        ${{ inputs.java_version }}
+          node_version:        ${{ inputs.node_version }}
+          android_api_level:   ${{ inputs.android_api_level }}
+          android_build_tools: ${{ inputs.android_build_tools }}
+
+      # ── 2. Pre-build hook (caller-provided script) ────────────────────────
+      - name: Run pre-build script
+        if: inputs.pre_build_script != ''
+        shell: bash
+        run: ${{ inputs.pre_build_script }}
+
+      # ── 3. Meteor/Cordova Android build ───────────────────────────────────
+      - name: Build Android with Meteor/Cordova
+        uses: mieweb/actions/run-meteor-build@v2
+        with:
+          platform: android
+          server: ${{ inputs.meteor_server }}
+          output_dir: ./android-build
+
+      # ── 4. Gradle sign (AAB/APK) ──────────────────────────────────────────
+      - name: Build & sign Android app
+        id: sign
+        uses: mieweb/actions/build-sign-android@v2
+        with:
+          signing_method:        ${{ inputs.signing_method }}
+          app_identifier:        ${{ inputs.app_identifier }}
+          android_build_dir:     android-build
+          build_type:            ${{ inputs.build_type }}
+          google_services_base64: ${{ secrets.GOOGLE_SERVICES_BASE64 }}
+          keystore_base64:       ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          keystore_password:     ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          key_alias:             ${{ secrets.ANDROID_KEY_ALIAS }}
+          key_password:          ${{ secrets.ANDROID_KEY_PASSWORD }}
+
+      # ── 5. Upload to Google Play (optional) ───────────────────────────────
+      - name: Publish to Google Play
+        if: inputs.upload_to_play && inputs.build_type == 'bundle'
+        uses: mieweb/actions/publish-android-to-play@v2
+        with:
+          signed_artifact_path: ${{ steps.sign.outputs.signed_artifact_path }}
+          play_json_key_base64: ${{ secrets.GOOGLE_PLAY_JSON_KEY_BASE64 }}
+          package_name:         ${{ inputs.app_identifier }}
+          track:                ${{ inputs.play_track }}
+          rollout_fraction:     ${{ inputs.rollout_fraction }}
+
+      # ── 6. Always keep the signed artifact as a build output ──────────────
+      - name: Upload signed artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-${{ inputs.build_type }}
+          path: ${{ steps.sign.outputs.signed_artifact_path }}
+          if-no-files-found: error

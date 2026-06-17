@@ -3,8 +3,8 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>mieweb/actions — iOS CI/CD without the pain</title>
-  <meta name="description" content="Reusable composite GitHub Actions and workflows for mieweb CI/CD. Ship iOS apps to TestFlight with a single uses: line — signing, build, and upload handled for you." />
+  <title>mieweb/actions — mobile CI/CD without the pain</title>
+  <meta name="description" content="Reusable composite GitHub Actions and workflows for mieweb CI/CD. Ship iOS and Android apps to TestFlight and Google Play with a single uses: line — signing, build, and upload handled for you." />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
@@ -26,11 +26,11 @@
 
     <div class="hero-inner">
       <p class="eyebrow">Reusable GitHub Actions &amp; workflows</p>
-      <h1>Ship iOS apps to TestFlight<br /><span class="grad">without the pain.</span></h1>
+      <h1>Ship mobile apps to TestFlight<br />&amp; Google Play <span class="grad">without the pain.</span></h1>
       <p class="lede">
         Code signing, build, archive, and upload — collapsed into a single
-        <code>uses:</code> line. Centralized signing, org-level secrets, and one
-        pipeline every repo gets fixes for at once.
+        <code>uses:</code> line for iOS <em>and</em> Android. Centralized signing,
+        org-level secrets, and one pipeline every repo gets fixes for at once.
       </p>
       <div class="cta-row">
         <a class="btn btn-primary" href="#quickstart">Get started</a>
@@ -39,7 +39,7 @@
 
       <pre class="hero-code"><code><span class="c-key">jobs</span>:
   <span class="c-key">ios</span>:
-    <span class="c-key">uses</span>: mieweb/actions/.github/workflows/ios-meteor.yml@v1
+    <span class="c-key">uses</span>: mieweb/actions/.github/workflows/build-ios-from-meteor.yml@v2
     <span class="c-key">secrets</span>: inherit
     <span class="c-key">with</span>:
       <span class="c-key">app_identifier</span>: org.mieweb.os.dev
@@ -88,28 +88,58 @@
       <div class="comp-grid">
         <div class="comp">
           <span class="tag tag-action">Composite action</span>
-          <h3><code>setup-meteor</code></h3>
-          <p>Prepare a Meteor/Cordova build environment — Xcode, Node, Meteor, <code>npm install</code> — before building.</p>
+          <h3><code>prepare-meteor-cordova-env</code></h3>
+          <p>Prepare a Meteor/Cordova iOS build environment — Xcode, Node, Meteor, <code>npm install</code> — before building.</p>
         </div>
         <div class="comp">
           <span class="tag tag-action">Composite action</span>
-          <h3><code>setup-expo</code></h3>
+          <h3><code>prepare-expo-env</code></h3>
           <p>Prepare an Expo build environment — Xcode, Node, JS deps — before <code>expo prebuild</code>.</p>
         </div>
         <div class="comp">
           <span class="tag tag-action">Composite action</span>
-          <h3><code>ios</code></h3>
+          <h3><code>prepare-android-env</code></h3>
+          <p>Prepare a Meteor/Cordova Android build environment — JDK, Node, Android SDK, Gradle, Meteor — before building.</p>
+        </div>
+        <div class="comp">
+          <span class="tag tag-action">Composite action</span>
+          <h3><code>run-meteor-build</code></h3>
+          <p>Run <code>meteor build</code> for a platform with a configurable DDP server URL and output directory.</p>
+        </div>
+        <div class="comp">
+          <span class="tag tag-action">Composite action</span>
+          <h3><code>sign-archive-upload-ios</code></h3>
           <p>Sign, archive, and optionally upload an iOS app to TestFlight. Use directly for bare React Native or custom pipelines.</p>
         </div>
         <div class="comp">
+          <span class="tag tag-action">Composite action</span>
+          <h3><code>build-sign-android</code></h3>
+          <p>Build and sign an Android AAB/APK from a Cordova/Gradle project — direct-keystore or fastlane signing.</p>
+        </div>
+        <div class="comp">
+          <span class="tag tag-action">Composite action</span>
+          <h3><code>publish-android-to-play</code></h3>
+          <p>Upload a signed AAB to a Google Play track — internal, beta, or production with staged rollout.</p>
+        </div>
+        <div class="comp">
           <span class="tag tag-flow">Reusable workflow</span>
-          <h3><code>ios-meteor.yml</code></h3>
+          <h3><code>build-ios-from-meteor.yml</code></h3>
           <p>One-call end-to-end pipeline for Meteor/Cordova iOS apps.</p>
         </div>
         <div class="comp">
           <span class="tag tag-flow">Reusable workflow</span>
-          <h3><code>ios-expo.yml</code></h3>
+          <h3><code>build-ios-from-expo.yml</code></h3>
           <p>One-call end-to-end pipeline for Expo iOS apps.</p>
+        </div>
+        <div class="comp">
+          <span class="tag tag-flow">Reusable workflow</span>
+          <h3><code>build-android-from-meteor.yml</code></h3>
+          <p>One-call end-to-end pipeline for Meteor/Cordova Android apps — build, sign, and publish to Google Play.</p>
+        </div>
+        <div class="comp">
+          <span class="tag tag-flow">Reusable workflow</span>
+          <h3><code>build-mobile-from-meteor.yml</code></h3>
+          <p>One-call pipeline that builds iOS and Android in parallel from a single caller.</p>
         </div>
       </div>
     </section>
@@ -133,7 +163,7 @@
 <span class="c-key">on</span>: [push]
 <span class="c-key">jobs</span>:
   <span class="c-key">ios</span>:
-    <span class="c-key">uses</span>: mieweb/actions/.github/workflows/ios-meteor.yml@v1
+    <span class="c-key">uses</span>: mieweb/actions/.github/workflows/build-ios-from-meteor.yml@v2
     <span class="c-key">secrets</span>: inherit
     <span class="c-key">with</span>:
       <span class="c-key">app_identifier</span>: org.mieweb.os.dev

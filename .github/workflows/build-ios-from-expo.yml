@@ -12,10 +12,10 @@
 # For apps that need custom steps with secret access (Firebase plist decode,
 # app.config.js patching, asset generation, etc.), compose the actions
 # directly:
-#   - mieweb/actions/setup-expo@v1
+#   - mieweb/actions/prepare-expo-env@v2
 #   - <your custom steps with direct ${{ secrets.* }} access>
 #   - run: npx expo prebuild --clean --platform ios --non-interactive
-#   - mieweb/actions/ios@v1   (with ios_build_dir: ios, run_pod_install: "true")
+#   - mieweb/actions/sign-archive-upload-ios@v2   (with ios_build_dir: ios, run_pod_install: "true")
 #
 # Callers use `secrets: inherit` — the workflow references secrets by
 # conventional names directly. No per-secret mapping needed.
@@ -82,9 +82,9 @@ jobs:
   build:
     runs-on: macos-latest
     steps:
-      # ── 1. Checkout, Xcode, Node, JS deps ─────────────────────────────────
+      # ── 1. Checkout, Xcode, Node, JS deps ──────────────────────────────
       - name: Setup Expo environment
-        uses: mieweb/actions/setup-expo@v1
+        uses: mieweb/actions/prepare-expo-env@v2
         with:
           xcode_path:        ${{ inputs.xcode_path }}
           node_version:      ${{ inputs.node_version }}
@@ -106,7 +106,7 @@ jobs:
 
       # ── 4. Fastlane: pod install + sign + archive + upload ───────────────
       - name: Build & upload iOS to TestFlight
-        uses: mieweb/actions/ios@v1
+        uses: mieweb/actions/sign-archive-upload-ios@v2
         with:
           app_identifier:                ${{ inputs.app_identifier }}
           apple_team_id:                 ${{ secrets.APPLE_TEAM_ID }}
