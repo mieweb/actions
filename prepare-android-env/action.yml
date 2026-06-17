@@ -1,0 +1,69 @@
+name: "Setup Meteor/Cordova Android Environment"
+description: >
+  Composite action that checks out the caller's repo, installs the JDK,
+  Node.js, the Android SDK (platform + build-tools), and Meteor, then runs
+  `meteor npm install`. Prepares everything needed to build a signed Android
+  app from a Meteor/Cordova project.
+
+inputs:
+  java_version:
+    description: "JDK version for the Android/Gradle build"
+    required: false
+    default: "17"
+  node_version:
+    description: "Node.js version"
+    required: false
+    default: "20"
+  android_api_level:
+    description: "Android SDK platform API level to install"
+    required: false
+    default: "34"
+  android_build_tools:
+    description: "Android SDK build-tools version to install"
+    required: false
+    default: "35.0.0"
+
+runs:
+  using: "composite"
+  steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+
+    - name: Setup JDK
+      uses: actions/setup-java@v4
+      with:
+        distribution: temurin
+        java-version: ${{ inputs.java_version }}
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ inputs.node_version }}
+
+    - name: Setup Android SDK
+      uses: android-actions/setup-android@v3
+
+    - name: Install Android SDK packages
+      shell: bash
+      env:
+        ANDROID_API_LEVEL: ${{ inputs.android_api_level }}
+        ANDROID_BUILD_TOOLS: ${{ inputs.android_build_tools }}
+      run: |
+        yes | sdkmanager --licenses >/dev/null || true
+        sdkmanager \
+          "platform-tools" \
+          "platforms;android-${ANDROID_API_LEVEL}" \
+          "build-tools;${ANDROID_BUILD_TOOLS}"
+
+    - name: Setup Gradle
+      uses: gradle/actions/setup-gradle@v4
+
+    - name: Install Meteor
+      shell: bash
+      run: |
+        curl https://install.meteor.com/ | sh
+        echo "$HOME/.meteor" >> $GITHUB_PATH
+
+    - name: Install Meteor dependencies
+      shell: bash
+      run: meteor npm install

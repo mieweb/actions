@@ -1,0 +1,63 @@
+name: "Publish Android App to Google Play"
+description: >
+  Composite action that uploads a signed Android App Bundle (.aab) to a Google
+  Play track (internal, alpha, beta, or production) via Fastlane `supply`.
+  Supports staged rollouts for production.
+
+inputs:
+  signed_artifact_path:
+    description: "Absolute path to the signed .aab to upload"
+    required: true
+  play_json_key_base64:
+    description: "Base64-encoded Google Play service account JSON key"
+    required: true
+  package_name:
+    description: "Android applicationId (e.g. com.bluehive.ozwell)"
+    required: true
+  track:
+    description: "Play track: internal | alpha | beta | production"
+    required: false
+    default: "internal"
+  rollout_fraction:
+    description: "Staged rollout fraction (e.g. '0.1' for 10%). Empty = full release."
+    required: false
+    default: ""
+  release_status:
+    description: "Release status: completed | draft | halted | inProgress"
+    required: false
+    default: "completed"
+
+  # ── Ruby setup ────────────────────────────────────────────────────────────
+  ruby_version:
+    description: "Ruby version for Fastlane"
+    required: false
+    default: "3.4"
+  setup_ruby:
+    description: "Install Ruby + bundle gems (set false if caller already did)"
+    required: false
+    default: "true"
+
+runs:
+  using: "composite"
+  steps:
+    - name: Setup Ruby and install Fastlane
+      if: inputs.setup_ruby == 'true'
+      uses: ruby/setup-ruby@v1
+      with:
+        ruby-version: ${{ inputs.ruby_version }}
+        bundler-cache: true
+        working-directory: ${{ github.action_path }}
+
+    - name: Upload to Google Play
+      shell: bash
+      working-directory: ${{ github.action_path }}
+      env:
+        PACKAGE_NAME:         ${{ inputs.package_name }}
+        AAB_PATH:             ${{ inputs.signed_artifact_path }}
+        PLAY_TRACK:           ${{ inputs.track }}
+        ROLLOUT_FRACTION:     ${{ inputs.rollout_fraction }}
+        RELEASE_STATUS:       ${{ inputs.release_status }}
+        PLAY_JSON_KEY_BASE64: ${{ inputs.play_json_key_base64 }}
+        FASTLANE_SKIP_UPDATE_CHECK: "1"
+        FASTLANE_DISABLE_COLORS:    "1"
+      run: bundle exec fastlane android publish_to_play_store

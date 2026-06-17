@@ -1,0 +1,45 @@
+default_platform(:android)
+
+platform :android do
+  desc "Build and sign a release Android bundle (AAB) or APK via Gradle"
+  lane :build_signed_bundle do
+    project_dir = ENV.fetch("PROJECT_DIR")
+    build_type  = ENV.fetch("BUILD_TYPE", "bundle")
+
+    # Decode the keystore from the base64 secret into a temp file.
+    keystore_path = File.join(ENV.fetch("RUNNER_TEMP"), "release.keystore")
+    File.open(keystore_path, "wb") do |f|
+      f.write(Base64.decode64(ENV.fetch("KEYSTORE_BASE64")))
+    end
+
+    task = build_type == "apk" ? "assembleRelease" : "bundleRelease"
+
+    gradle(
+      project_dir: project_dir,
+      task:        task,
+      properties: {
+        "android.injected.signing.store.file"     => keystore_path,
+        "android.injected.signing.store.password" => ENV.fetch("KEYSTORE_PASSWORD"),
+        "android.injected.signing.key.alias"      => ENV.fetch("KEY_ALIAS"),
+        "android.injected.signing.key.password"   => ENV.fetch("KEY_PASSWORD")
+      }
+    )
+
+    artifact = if build_type == "apk"
+      lane_context[SharedValues::GRADLE_APK_OUTPUT_PATH]
+    else
+      lane_context[SharedValues::GRADLE_AAB_OUTPUT_PATH]
+    end
+
+    # Export the artifact path for the composite action's output.
+    if ENV["GITHUB_OUTPUT"]
+      File.open(ENV.fetch("GITHUB_OUTPUT"), "a") do |f|
+        f.puts("artifact_path=#{artifact}")
+      end
+    end
+
+    UI.success("Signed Android artifact: #{artifact}")
+  ensure
+    File.delete(keystore_path) if keystore_path && File.exist?(keystore_path)
+  end
+end

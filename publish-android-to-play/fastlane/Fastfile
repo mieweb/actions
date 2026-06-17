@@ -1,0 +1,33 @@
+default_platform(:android)
+
+platform :android do
+  desc "Upload a signed AAB to a Google Play track via supply"
+  lane :publish_to_play_store do
+    # Decode the service account JSON from the base64 secret into a temp file.
+    json_key_path = File.join(ENV.fetch("RUNNER_TEMP"), "play-service-account.json")
+    File.open(json_key_path, "wb") do |f|
+      f.write(Base64.decode64(ENV.fetch("PLAY_JSON_KEY_BASE64")))
+    end
+
+    rollout = ENV.fetch("ROLLOUT_FRACTION", "")
+
+    params = {
+      package_name:            ENV.fetch("PACKAGE_NAME"),
+      json_key:                json_key_path,
+      aab:                     ENV.fetch("AAB_PATH"),
+      track:                   ENV.fetch("PLAY_TRACK", "internal"),
+      release_status:          ENV.fetch("RELEASE_STATUS", "completed"),
+      skip_upload_metadata:    true,
+      skip_upload_changelogs:  true,
+      skip_upload_images:      true,
+      skip_upload_screenshots: true
+    }
+    params[:rollout] = rollout unless rollout.empty?
+
+    upload_to_play_store(**params)
+
+    UI.success("Uploaded #{ENV.fetch('AAB_PATH')} to '#{params[:track]}' track")
+  ensure
+    File.delete(json_key_path) if json_key_path && File.exist?(json_key_path)
+  end
+end
