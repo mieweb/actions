@@ -16,8 +16,12 @@
 # conventional names directly. No per-secret mapping needed.
 #
 # Required secrets (org or repo level):
-#   APPLE_TEAM_ID, MATCH_GIT_BASIC_AUTHORIZATION, MATCH_PASSWORD,
-#   APPLE_API_KEY_ID, APPLE_API_ISSUER_ID, APPLE_API_KEY_P8_BASE64
+#   APPLE_TEAM_ID, APPLE_API_KEY_ID, APPLE_API_ISSUER_ID, APPLE_API_KEY_P8_BASE64
+#   match mode:      MATCH_GIT_BASIC_AUTHORIZATION, MATCH_PASSWORD
+#   secrets mode:    IOS_DIST_CERT_P12_BASE64, IOS_DIST_CERT_PASSWORD,
+#                    IOS_PROVISIONING_PROFILE_BASE64
+#   cert-api mode:   IOS_DIST_CERT_P12_BASE64, IOS_DIST_CERT_PASSWORD
+#                    (profile is downloaded via the App Store Connect API key)
 # ─────────────────────────────────────────────────────────────────────────────
 name: iOS Meteor/Cordova Build & Upload
 
@@ -55,7 +59,7 @@ on:
 
       # ── Build configuration ─────────────────────────────────────────────────
       signing_mode:
-        description: "'match' or 'secrets'"
+        description: "'match', 'secrets', or 'cert-api'"
         required: false
         type: string
         default: "match"
@@ -97,6 +101,9 @@ jobs:
           apple_team_id:               ${{ secrets.APPLE_TEAM_ID }}
           match_git_basic_authorization: ${{ secrets.MATCH_GIT_BASIC_AUTHORIZATION }}
           match_password:              ${{ secrets.MATCH_PASSWORD }}
+          ios_cert_p12_base64:         ${{ secrets.IOS_DIST_CERT_P12_BASE64 }}
+          ios_cert_password:           ${{ secrets.IOS_DIST_CERT_PASSWORD }}
+          ios_prov_profile_base64:     ${{ secrets.IOS_PROVISIONING_PROFILE_BASE64 }}
           apple_api_key_id:            ${{ secrets.APPLE_API_KEY_ID }}
           apple_api_issuer_id:         ${{ secrets.APPLE_API_ISSUER_ID }}
           apple_api_key_p8_base64:     ${{ secrets.APPLE_API_KEY_P8_BASE64 }}

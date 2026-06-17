@@ -1,13 +1,14 @@
 name: "Fastlane iOS Build & Upload"
 description: >
   Composite action that signs, archives, and optionally uploads an iOS app to
-  TestFlight. Supports two signing modes: `match` (git-stored certs) and
-  `secrets` (raw cert + profile from GitHub secrets).
+  TestFlight. Supports three signing modes: `match` (git-stored certs),
+  `secrets` (raw cert + profile from GitHub secrets), and `cert-api` (raw cert
+  from secrets + provisioning profile downloaded via the App Store Connect API).
 
 inputs:
   # ── Mode ──────────────────────────────────────────────────────────────────
   signing_mode:
-    description: "Signing strategy: 'match' (git repo) or 'secrets' (raw cert + profile)"
+    description: "Signing strategy: 'match' (git repo), 'secrets' (raw cert + profile), or 'cert-api' (raw cert + API-downloaded profile)"
     required: false
     default: "match"
 
@@ -41,13 +42,13 @@ inputs:
 
   # ── Secrets-mode inputs (ignored when signing_mode=match) ─────────────────
   ios_cert_p12_base64:
-    description: "Base64-encoded distribution certificate (.p12)"
+    description: "Base64-encoded distribution certificate (.p12). Used by 'secrets' and 'cert-api' modes."
     required: false
   ios_cert_password:
-    description: "Password for the .p12 certificate"
+    description: "Password for the .p12 certificate. Used by 'secrets' and 'cert-api' modes."
     required: false
   ios_prov_profile_base64:
-    description: "Base64-encoded provisioning profile (.mobileprovision)"
+    description: "Base64-encoded provisioning profile (.mobileprovision). Used by 'secrets' mode only; 'cert-api' downloads the profile instead."
     required: false
 
   # ── App Store Connect API ─────────────────────────────────────────────────
@@ -133,9 +134,9 @@ runs:
         echo "Discovered workspace: $WORKSPACE"
         echo "Discovered scheme:    $SCHEME"
 
-    # ── 3. Secrets-mode: import cert + profile into keychain ────────────────
+    # ── 3. Secrets / cert-api mode: import cert (+ profile) into keychain ───
     - name: Import signing certificate and profile
-      if: inputs.signing_mode == 'secrets'
+      if: inputs.signing_mode == 'secrets' || inputs.signing_mode == 'cert-api'
       shell: bash
       working-directory: ${{ github.action_path }}
       env:

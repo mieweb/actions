@@ -10,13 +10,19 @@ platform :android do
     end
 
     rollout = ENV.fetch("ROLLOUT_FRACTION", "")
+    release_status = ENV.fetch("RELEASE_STATUS", "completed")
+
+    # Google Play rejects a partial staged rollout when release_status is
+    # 'completed' — a rollout must use 'inProgress'. Coerce automatically so
+    # callers only need to set rollout_fraction.
+    release_status = "inProgress" if !rollout.empty? && release_status == "completed"
 
     params = {
       package_name:            ENV.fetch("PACKAGE_NAME"),
       json_key:                json_key_path,
       aab:                     ENV.fetch("AAB_PATH"),
       track:                   ENV.fetch("PLAY_TRACK", "internal"),
-      release_status:          ENV.fetch("RELEASE_STATUS", "completed"),
+      release_status:          release_status,
       skip_upload_metadata:    true,
       skip_upload_changelogs:  true,
       skip_upload_images:      true,

@@ -1,5 +1,34 @@
 # Changelog
 
+## v2.1.0
+
+### Added
+
+- `sign-archive-upload-ios` — new iOS signing mode `cert-api`: imports a raw
+  `.p12` distribution certificate from a secret and downloads the App Store
+  provisioning profile via the App Store Connect API key (Fastlane `sigh`,
+  read-only). No provisioning-profile secret required. The existing API key is
+  reused, so no new secrets are needed beyond the cert.
+- `.github/workflows/build-mobile-from-meteor.yml` — now declares all signing
+  secrets explicitly (every secret optional), so callers with channel-specific
+  secret names can map them per channel (e.g.
+  `ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_DEV_BASE64 }}`).
+  Callers with conventional names can still use `secrets: inherit`.
+
+### Changed
+
+- `build-ios-from-meteor.yml` now forwards `IOS_DIST_CERT_P12_BASE64`,
+  `IOS_DIST_CERT_PASSWORD`, and `IOS_PROVISIONING_PROFILE_BASE64` to the iOS
+  action, enabling `secrets` and `cert-api` modes through the reusable workflow.
+- `import-signing.sh` treats the provisioning profile as optional (cert-only
+  import for `cert-api` mode).
+
+### Fixed
+
+- `publish-android-to-play` — a partial staged rollout with
+  `release_status: completed` is now automatically coerced to `inProgress`,
+  which Google Play requires (previously rejected the upload).
+
 ## v2.0.0
 
 ### Breaking changes
