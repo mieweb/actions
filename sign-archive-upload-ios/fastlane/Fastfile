@@ -16,6 +16,9 @@ platform :ios do
       in_house:              false
     )
 
+    profile_name = nil
+    profile_uuid = nil
+
     # ── Signing: match mode ─────────────────────────────────────────────────
     if signing_mode == "match"
       # Creates a temporary keychain so match can import certs without GUI prompts
@@ -27,8 +30,29 @@ platform :ios do
         readonly:       ENV.fetch("MATCH_READONLY", "true") != "false",
         api_key:        api_key
       )
+
+      # Derive profile name: "match AppStore org.example.app" unless explicitly overridden
+      match_type   = ENV.fetch("MATCH_TYPE", "appstore")
+      profile_name = ENV.fetch("PROFILE_NAME", "")
+      profile_name = "match #{match_type.capitalize} #{app_id}" if profile_name.empty?
+      # For "appstore" → "AppStore" (Fastlane convention)
+      profile_name = profile_name.sub(/\bmatch appstore\b/i, "match AppStore")
+
+    elsif signing_mode == "cert-api"
+      # cert-api mode: the .p12 cert is already imported into the temp keychain by
+      # scripts/import-signing.sh. Download (don't create) the App Store
+      # provisioning profile via the App Store Connect API key.
+      get_provisioning_profile(
+        api_key:        api_key,
+        app_identifier: app_id,
+        readonly:       true
+      )
+      profile_uuid = lane_context[SharedValues::SIGH_UUID]
+
+    else
+      # secrets mode: cert + profile already imported by scripts/import-signing.sh
+      profile_uuid = ENV.fetch("PROFILE_UUID")
     end
-    # secrets mode: cert + profile already imported by scripts/import-signing.sh
 
     # ── Build xcargs ────────────────────────────────────────────────────────
     xcargs_parts = [
@@ -37,17 +61,10 @@ platform :ios do
     ]
 
     if signing_mode == "match"
-      # Derive profile name: "match AppStore org.example.app" unless explicitly overridden
-      match_type   = ENV.fetch("MATCH_TYPE", "appstore")
-      profile_name = ENV.fetch("PROFILE_NAME", "")
-      profile_name = "match #{match_type.capitalize} #{app_id}" if profile_name.empty?
-      # For "appstore" → "AppStore" (Fastlane convention)
-      profile_name = profile_name.sub(/\bmatch appstore\b/i, "match AppStore")
-
       xcargs_parts << "PROVISIONING_PROFILE_SPECIFIER=\"#{profile_name}\""
     else
-      # secrets mode: reference the profile by UUID + point at the temp keychain
-      xcargs_parts << "PROVISIONING_PROFILE_SPECIFIER=#{ENV.fetch('PROFILE_UUID')}"
+      # secrets / cert-api: reference the profile by UUID + point at the temp keychain
+      xcargs_parts << "PROVISIONING_PROFILE_SPECIFIER=#{profile_uuid}"
       xcargs_parts << "OTHER_CODE_SIGN_FLAGS=\"--keychain #{ENV.fetch('KEYCHAIN_PATH')}\""
     end
 
@@ -55,7 +72,7 @@ platform :ios do
     export_profiles = if signing_mode == "match"
       { app_id => profile_name }
     else
-      { app_id => ENV.fetch("PROFILE_UUID") }
+      { app_id => profile_uuid }
     end
 
     # ── Resolve workspace path (relative to app checkout, not action dir) ──

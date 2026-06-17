@@ -5,16 +5,19 @@
 # Expected env vars (set by action.yml):
 #   IOS_CERT_P12_BASE64       Base64-encoded distribution certificate (.p12)
 #   IOS_CERT_PASSWORD          Password for the .p12 file
-#   IOS_PROV_PROFILE_BASE64   Base64-encoded provisioning profile (.mobileprovision)
+#   IOS_PROV_PROFILE_BASE64   Base64-encoded provisioning profile (.mobileprovision).
+#                             OPTIONAL — omit in cert-api mode, where Fastlane
+#                             downloads the profile via the App Store Connect API.
 #
 # Exports to $GITHUB_ENV:
 #   KEYCHAIN_PATH   Path to the temporary keychain containing the imported cert
-#   PROFILE_UUID    UUID of the installed provisioning profile
+#   PROFILE_UUID    UUID of the installed provisioning profile (only when a
+#                   profile was provided)
 # ─────────────────────────────────────────────────────────────────────────────
 set -euo pipefail
 
 # ── Validate required inputs ────────────────────────────────────────────────
-for var in IOS_CERT_P12_BASE64 IOS_CERT_PASSWORD IOS_PROV_PROFILE_BASE64; do
+for var in IOS_CERT_P12_BASE64 IOS_CERT_PASSWORD; do
   if [[ -z "${!var:-}" ]]; then
     echo "::error::Required env var $var is not set"
     exit 1
@@ -48,27 +51,31 @@ security set-key-partition-list \
 # Add the new keychain to the search list so xcodebuild can find it
 security list-keychains -d user -s "$KEYCHAIN_PATH" login.keychain
 
-# ── Install provisioning profile ───────────────────────────────────────────
-PROFILE_PATH="${RUNNER_TEMP}/profile.mobileprovision"
-echo "$IOS_PROV_PROFILE_BASE64" | base64 --decode > "$PROFILE_PATH"
+# ── Install provisioning profile (skipped in cert-api mode) ────────────────
+if [[ -n "${IOS_PROV_PROFILE_BASE64:-}" ]]; then
+  PROFILE_PATH="${RUNNER_TEMP}/profile.mobileprovision"
+  echo "$IOS_PROV_PROFILE_BASE64" | base64 --decode > "$PROFILE_PATH"
 
-mkdir -p ~/Library/MobileDevice/Provisioning\ Profiles
+  mkdir -p ~/Library/MobileDevice/Provisioning\ Profiles
 
-PROFILE_UUID="$(
-  security cms -D -i "$PROFILE_PATH" \
-    | grep -A1 UUID \
-    | grep string \
-    | sed 's/.*<string>\(.*\)<\/string>/\1/'
-)"
+  PROFILE_UUID="$(
+    security cms -D -i "$PROFILE_PATH" \
+      | grep -A1 UUID \
+      | grep string \
+      | sed 's/.*<string>\(.*\)<\/string>/\1/'
+  )"
 
-cp "$PROFILE_PATH" \
-  ~/Library/MobileDevice/Provisioning\ Profiles/"${PROFILE_UUID}".mobileprovision
+  cp "$PROFILE_PATH" \
+    ~/Library/MobileDevice/Provisioning\ Profiles/"${PROFILE_UUID}".mobileprovision
 
-echo "Installed provisioning profile: ${PROFILE_UUID}"
+  echo "Installed provisioning profile: ${PROFILE_UUID}"
+  echo "PROFILE_UUID=${PROFILE_UUID}" >> "$GITHUB_ENV"
+else
+  echo "No provisioning profile provided — cert-api mode will download it via Fastlane."
+fi
 
 # ── Export vars for downstream steps ────────────────────────────────────────
 echo "KEYCHAIN_PATH=${KEYCHAIN_PATH}" >> "$GITHUB_ENV"
-echo "PROFILE_UUID=${PROFILE_UUID}"   >> "$GITHUB_ENV"
 
 # Clean up decoded cert from disk (profile copy is already in the standard dir)
 rm -f "$CERT_PATH"

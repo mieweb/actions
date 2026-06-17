@@ -70,9 +70,9 @@ depend on which `signing_mode` you use.
 | `APPLE_API_KEY_P8_BASE64` | **always** | all | Base64-encoded App Store Connect API key (`.p8`) |
 | `MATCH_GIT_BASIC_AUTHORIZATION` | `match` mode | signing | Base64 `user:token` for the match signing repo |
 | `MATCH_PASSWORD` | `match` mode | signing | Encryption passphrase for match-stored certs/profiles |
-| `IOS_DIST_CERT_P12_BASE64` | `secrets` mode | signing | Base64-encoded distribution certificate (`.p12`) |
-| `IOS_DIST_CERT_PASSWORD` | `secrets` mode | signing | Password for the `.p12` certificate |
-| `IOS_PROVISIONING_PROFILE_BASE64` | `secrets` mode | signing | Base64-encoded provisioning profile (`.mobileprovision`) |
+| `IOS_DIST_CERT_P12_BASE64` | `secrets` / `cert-api` mode | signing | Base64-encoded distribution certificate (`.p12`) |
+| `IOS_DIST_CERT_PASSWORD` | `secrets` / `cert-api` mode | signing | Password for the `.p12` certificate |
+| `IOS_PROVISIONING_PROFILE_BASE64` | `secrets` mode | signing | Base64-encoded provisioning profile (`.mobileprovision`). `cert-api` downloads it via the API key instead. |
 
 ### Android secrets
 
@@ -169,12 +169,13 @@ and signing.
 ### `sign-archive-upload-ios` — Composite action
 
 Signs, archives, and optionally uploads an iOS app to TestFlight via Fastlane.
-Supports two code-signing strategies.
+Supports three code-signing strategies.
 
 | Mode | How it works | When to use |
 |---|---|---|
 | `match` | Fetches encrypted cert + profile from a shared git repo, decrypts with `match_password` | Multiple repos share one signing identity |
 | `secrets` | Decodes a raw `.p12` cert + `.mobileprovision` from GitHub secrets, imports into a temporary keychain | Single repo, or you want to avoid a signing repo dependency |
+| `cert-api` | Decodes a raw `.p12` cert from a secret, then downloads the App Store provisioning profile via the App Store Connect API key (Fastlane `sigh`, read-only) | You manage certs manually but want profiles fetched automatically — no profile secret to rotate |
 
 ```yaml
 - uses: mieweb/actions/sign-archive-upload-ios@v2
@@ -193,7 +194,7 @@ Supports two code-signing strategies.
 
 | Input | Required | Default | Description |
 |---|---|---|---|
-| `signing_mode` | | `match` | `match` or `secrets` |
+| `signing_mode` | | `match` | `match`, `secrets`, or `cert-api` |
 | `app_identifier` | **yes** | — | Bundle ID |
 | `apple_team_id` | **yes** | — | Apple Developer Team ID |
 | `match_git_url` | if match | `https://github.com/mieweb/mobile-signing` | Match signing repo URL |
@@ -201,9 +202,9 @@ Supports two code-signing strategies.
 | `match_password` | if match | — | Encryption passphrase for match |
 | `match_type` | | `appstore` | Match profile type |
 | `match_readonly` | | `true` | Never create/renew certs in CI |
-| `ios_cert_p12_base64` | if secrets | — | Base64 distribution cert (.p12) |
-| `ios_cert_password` | if secrets | — | Password for the .p12 |
-| `ios_prov_profile_base64` | if secrets | — | Base64 provisioning profile |
+| `ios_cert_p12_base64` | if secrets/cert-api | — | Base64 distribution cert (.p12) |
+| `ios_cert_password` | if secrets/cert-api | — | Password for the .p12 |
+| `ios_prov_profile_base64` | if secrets | — | Base64 provisioning profile (cert-api downloads it via the API key) |
 | `apple_api_key_id` | **yes** | — | App Store Connect API Key ID |
 | `apple_api_issuer_id` | **yes** | — | App Store Connect Issuer ID |
 | `apple_api_key_p8_base64` | **yes** | — | Base64 API key (.p8) |
@@ -326,7 +327,7 @@ up but before `meteor build`. Use it for any project-specific setup
 | `xcode_path` | | `/Applications/Xcode_26.app` | Absolute path to Xcode.app |
 | `node_version` | | `20` | Node.js version |
 | `pre_build_script` | | — | Inline bash to run before `meteor build` |
-| `signing_mode` | | `match` | `match` or `secrets` |
+| `signing_mode` | | `match` | `match`, `secrets`, or `cert-api` |
 | `upload_to_testflight` | | `true` | Upload IPA to TestFlight |
 
 #### Required secrets (org or repo level)
@@ -478,7 +479,7 @@ jobs:
 | `pre_build_script` | | — | Inline bash to run before `meteor build` |
 | `ios_app_identifier` | if building iOS | — | iOS bundle ID |
 | `xcode_path` | | `/Applications/Xcode_26.app` | Absolute path to Xcode.app |
-| `ios_signing_mode` | | `match` | iOS `match` or `secrets` |
+| `ios_signing_mode` | | `match` | iOS `match`, `secrets`, or `cert-api` |
 | `upload_to_testflight` | | `true` | Upload IPA to TestFlight |
 | `android_app_identifier` | if building Android | — | Android applicationId |
 | `java_version` | | `17` | JDK version |
