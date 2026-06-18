@@ -53,4 +53,9 @@ runs:
 
     - name: Install Meteor dependencies
       shell: bash
+      env:
+        # Authenticate to GitHub Packages so private deps (e.g.
+        # @bluehive-health/*) resolve. The caller's .npmrc references
+        # ${GITHUB_TOKEN}; npm expands it from this env var at install time.
+        GITHUB_TOKEN: ${{ github.token }}
       run: meteor npm install
