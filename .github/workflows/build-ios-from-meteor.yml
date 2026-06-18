@@ -82,6 +82,9 @@ jobs:
           # Prefer a caller-supplied PAT (read:packages) for GitHub Packages
           # auth; fall back to the automatic token for same-org callers.
           github_packages_token: ${{ secrets.GH_PACKAGES_TOKEN || github.token }}
+          # Optional SSH key for cloning private git submodules (e.g. Meteor
+          # packages in separate private repos). Empty = no submodules.
+          ssh_key: ${{ secrets.SSH_PRIVATE_KEY }}
 
       # ── 2. Pre-build hook (caller-provided script) ────────────────────────
       - name: Run pre-build script
