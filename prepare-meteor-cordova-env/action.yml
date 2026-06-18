@@ -63,8 +63,14 @@ runs:
     - name: Install Meteor dependencies
       shell: bash
       env:
-        # Authenticate to GitHub Packages so private deps (e.g.
-        # @bluehive-health/*) resolve. The caller's .npmrc references
-        # ${GITHUB_TOKEN}; npm expands it from this env var at install time.
-        GITHUB_TOKEN: ${{ inputs.github_packages_token }}
-      run: meteor npm install
+        GH_PACKAGES_TOKEN: ${{ inputs.github_packages_token }}
+      run: |
+        # The caller's .npmrc ships a bare GITHUB_TOKEN placeholder for private
+        # GitHub Packages deps (e.g. @bluehive-health/*). Replace it with the
+        # real token before installing. Matches the sed convention used across
+        # the bluehive build workflows; npm does NOT expand a bare placeholder.
+        if [ -f .npmrc ] && [ -n "$GH_PACKAGES_TOKEN" ]; then
+          sed -i.bak "s/GITHUB_TOKEN/${GH_PACKAGES_TOKEN}/g" .npmrc
+          rm -f .npmrc.bak
+        fi
+        meteor npm install
