@@ -92,6 +92,26 @@ jobs:
         shell: bash
         run: ${{ inputs.pre_build_script }}
 
+      # ── 2b. Firebase google-services.json for the Meteor build ────────────
+      # Meteor evaluates mobile-config.js for every Cordova build. If it
+      # declares App.addResourceFile('private/google-services.json', …),
+      # `meteor build` copies that source file during the prepare phase — even
+      # for the iOS target — so it must exist BEFORE step 3 or the build fails
+      # with ENOENT on private/google-services.json.
+      # No-op when GOOGLE_SERVICES_BASE64 is unset.
+      - name: Write Firebase google-services.json
+        shell: bash
+        env:
+          GOOGLE_SERVICES_BASE64: ${{ secrets.GOOGLE_SERVICES_BASE64 }}
+        run: |
+          if [ -z "$GOOGLE_SERVICES_BASE64" ]; then
+            echo "No GOOGLE_SERVICES_BASE64 provided; skipping private/google-services.json."
+            exit 0
+          fi
+          mkdir -p private
+          printf '%s' "$GOOGLE_SERVICES_BASE64" | base64 --decode > private/google-services.json
+          echo "Wrote private/google-services.json ($(wc -c < private/google-services.json) bytes)."
+
       # ── 3. Meteor/Cordova iOS build ──────────────────────────────────────
       - name: Build iOS with Meteor/Cordova
         uses: mieweb/actions/run-meteor-build@v2
