@@ -110,6 +110,9 @@ jobs:
           node_version:        ${{ inputs.node_version }}
           android_api_level:   ${{ inputs.android_api_level }}
           android_build_tools: ${{ inputs.android_build_tools }}
+          # Prefer a caller-supplied PAT (read:packages) for GitHub Packages
+          # auth; fall back to the automatic token for same-org callers.
+          github_packages_token: ${{ secrets.GH_PACKAGES_TOKEN || github.token }}
 
       # ── 2. Pre-build hook (caller-provided script) ────────────────────────
       - name: Run pre-build script

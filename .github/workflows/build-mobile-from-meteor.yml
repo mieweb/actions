@@ -119,6 +119,11 @@ on:
 
     # ── Secrets (all optional; map channel-specific names here per caller) ──
     secrets:
+      # GitHub Packages — PAT (read:packages) for private npm deps. Needed when
+      # the caller's packages live in a different org than this reusable
+      # workflow, where the automatic github.token lacks package read access.
+      GH_PACKAGES_TOKEN:
+        required: false
       # iOS — App Store Connect API (required for any iOS build)
       APPLE_TEAM_ID:
         required: false
