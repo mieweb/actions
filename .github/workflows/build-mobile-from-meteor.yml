@@ -124,6 +124,10 @@ on:
       # workflow, where the automatic github.token lacks package read access.
       GH_PACKAGES_TOKEN:
         required: false
+      # SSH key for cloning private git submodules (e.g. Meteor packages hosted
+      # in separate private repos). Empty = submodules skipped.
+      SSH_PRIVATE_KEY:
+        required: false
       # iOS — App Store Connect API (required for any iOS build)
       APPLE_TEAM_ID:
         required: false

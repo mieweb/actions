@@ -21,12 +21,25 @@ inputs:
       lacks package read access), pass a PAT with read:packages.
     required: false
     default: ${{ github.token }}
+  ssh_key:
+    description: >
+      SSH private key for cloning private git submodules (e.g. Meteor
+      packages hosted in separate private repos). Optional. When empty,
+      checkout uses the default token and submodules are skipped, preserving
+      the previous behaviour for callers without submodules.
+    required: false
+    default: ""
 
 runs:
   using: "composite"
   steps:
     - name: Checkout
       uses: actions/checkout@v4
+      with:
+        # Clone private submodules over SSH only when a key is supplied;
+        # otherwise behave exactly as before (token auth, no submodules).
+        submodules: ${{ inputs.ssh_key != '' && 'recursive' || 'false' }}
+        ssh-key: ${{ inputs.ssh_key }}
 
     - name: Select Xcode
       shell: bash
