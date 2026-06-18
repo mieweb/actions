@@ -12,6 +12,15 @@ inputs:
     description: "Node.js version"
     required: false
     default: "20"
+  github_packages_token:
+    description: >
+      Token used to authenticate `meteor npm install` to GitHub Packages for
+      private deps (e.g. @bluehive-health/*). Defaults to the automatic
+      github.token, which works when the caller and the packages live in the
+      same org. For cross-org reusable-workflow callers (where github.token
+      lacks package read access), pass a PAT with read:packages.
+    required: false
+    default: ${{ github.token }}
 
 runs:
   using: "composite"
@@ -57,5 +66,5 @@ runs:
         # Authenticate to GitHub Packages so private deps (e.g.
         # @bluehive-health/*) resolve. The caller's .npmrc references
         # ${GITHUB_TOKEN}; npm expands it from this env var at install time.
-        GITHUB_TOKEN: ${{ github.token }}
+        GITHUB_TOKEN: ${{ inputs.github_packages_token }}
       run: meteor npm install
