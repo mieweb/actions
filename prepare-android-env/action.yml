@@ -69,6 +69,10 @@ runs:
 
     - name: Setup Android SDK
       uses: android-actions/setup-android@v4
+      with:
+        # Google removed the legacy 'tools' package (the action's default)
+        # from the SDK repo; installing it now fails every fresh runner.
+        packages: platform-tools
 
     - name: Install Android SDK packages
       shell: bash
