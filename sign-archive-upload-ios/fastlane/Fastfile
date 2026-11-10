@@ -92,6 +92,7 @@ platform :ios do
       configuration:  ENV.fetch("BUILD_CONFIGURATION", "Release"),
       export_method:  ENV.fetch("EXPORT_METHOD", "app-store"),
       xcargs:         xcargs_parts.join(" "),
+      output_directory: ENV.fetch("OUTPUT_DIRECTORY"),
       export_options: {
         provisioningProfiles: export_profiles
       }

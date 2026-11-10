@@ -112,13 +112,16 @@ For Android builds (the `build-android-from-meteor.yml` workflow and the
 ### `prepare-meteor-cordova-env` — Composite action
 
 Sets up the Meteor/Cordova build environment: checks out the repo, selects
-Xcode, installs Node.js and Meteor, and runs `meteor npm install`.
+Xcode, installs Node.js and Meteor, and installs dependencies with
+`install_command` (default `meteor npm install`).
 
 ```yaml
 - uses: mieweb/actions/prepare-meteor-cordova-env@v2
   with:
-    xcode_path:   /Applications/Xcode_26.app  # optional, default
-    node_version: "20"                       # optional, default
+    xcode_path:      /Applications/Xcode_26.app  # optional, default
+    node_version:    "20"                        # optional, default
+    setup_pnpm:      "false"                     # optional: install pnpm from package.json `packageManager`
+    install_command: meteor npm install          # optional, default
 ```
 
 ### `prepare-expo-env` — Composite action
@@ -141,7 +144,8 @@ optional pre-build hook.
 
 Sets up the Meteor/Cordova **Android** build environment: checks out the repo,
 installs the JDK, Node.js, the Android SDK (platform + build-tools), Gradle,
-and Meteor, then runs `meteor npm install`. Runs on `ubuntu-latest`.
+and Meteor, then installs dependencies with `install_command` (default
+`meteor npm install`). Runs on `ubuntu-latest`.
 
 ```yaml
 - uses: mieweb/actions/prepare-android-env@v2
@@ -150,6 +154,8 @@ and Meteor, then runs `meteor npm install`. Runs on `ubuntu-latest`.
     node_version:        "20"      # optional, default
     android_api_level:   "36"      # optional, default
     android_build_tools: "36.0.0"  # optional, default
+    setup_pnpm:          "false"   # optional: install pnpm from package.json `packageManager`
+    install_command:     meteor npm install  # optional, default
 ```
 
 The action installs `platform-tools`, `platforms;android-36`, and
@@ -171,6 +177,8 @@ and signing.
     platform:   android            # 'ios' or 'android'
     server:     https://app.example.com
     output_dir: ./android-build    # optional, default ./ios-build
+    mobile_settings: settings.json # optional: passed as --mobile-settings
+    extra_args: ""                 # optional: extra whitespace-separated args
 ```
 
 ### `sign-archive-upload-ios` — Composite action
@@ -219,7 +227,15 @@ Supports three code-signing strategies.
 | `xcode_scheme` | | auto-discovered | Xcode scheme name |
 | `run_pod_install` | | `false` | Run `pod install` before Fastlane (set `true` for Cordova) |
 | `upload_to_testflight` | | `true` | Upload IPA to TestFlight. Set `false` to stop after producing a signed IPA (no upload). |
+| `output_directory` | | `${{ github.workspace }}/ios-ipa` | Where the signed IPA and dSYM zip are written |
 | `ruby_version` | | `3.4` | Ruby version for Fastlane |
+
+#### Outputs
+
+| Output | Description |
+|---|---|
+| `ipa_path` | Path to the signed IPA (empty if not produced) |
+| `dsym_path` | Path to the dSYM zip (empty if not produced) |
 
 ### `build-sign-android` — Composite action
 
@@ -333,9 +349,18 @@ up but before `meteor build`. Use it for any project-specific setup
 | `meteor_server` | **yes** | — | Meteor DDP server URL |
 | `xcode_path` | | `/Applications/Xcode_26.app` | Absolute path to Xcode.app |
 | `node_version` | | `20` | Node.js version |
+| `runner` | | `macos-latest` | Runner label for the build job |
+| `setup_pnpm` | | `false` | Install pnpm (version from `packageManager` in `package.json`) |
+| `install_command` | | `meteor npm install` | Command that installs dependencies |
 | `pre_build_script` | | — | Inline bash to run before `meteor build` |
+| `mobile_settings` | | — | Settings JSON passed to `meteor build --mobile-settings` |
 | `signing_mode` | | `match` | `match`, `secrets`, or `cert-api` |
 | `upload_to_testflight` | | `true` | Upload IPA to TestFlight |
+| `artifact_name` | | `ios-ipa` | Artifact name for the IPA + dSYM; gym logs upload as `<name>-logs` |
+
+The IPA, dSYM and gym logs are uploaded as artifacts even when signing or the
+TestFlight upload fails, and a run summary is written. The workflow output
+`artifact` holds the artifact name.
 
 #### Required secrets (org or repo level)
 
@@ -442,12 +467,22 @@ jobs:
 | `java_version` | | `17` | JDK version |
 | `android_api_level` | | `36` | Android SDK platform API level and expected AAB target SDK |
 | `android_build_tools` | | `36.0.0` | Android SDK build-tools version |
+| `runner` | | `ubuntu-latest` | Runner label for the build job |
+| `free_disk_space` | | `false` | Remove unused preinstalled toolchains (.NET, GHC, CodeQL, Docker images) before building |
+| `setup_pnpm` | | `false` | Install pnpm (version from `packageManager` in `package.json`) |
+| `install_command` | | `meteor npm install` | Command that installs dependencies |
 | `pre_build_script` | | — | Inline bash to run before `meteor build` |
+| `mobile_settings` | | — | Settings JSON passed to `meteor build --mobile-settings` |
 | `signing_method` | | `direct-keystore` | `direct-keystore` or `fastlane` |
 | `build_type` | | `bundle` | `bundle` (AAB) or `apk` |
 | `upload_to_play` | | `true` | Upload the signed AAB to Google Play |
 | `play_track` | | `internal` | `internal` \| `alpha` \| `beta` \| `production` |
 | `rollout_fraction` | | — | Staged rollout fraction (empty = full release) |
+| `artifact_name` | | `android-<build_type>` | Artifact name for the signed AAB/APK |
+
+The signed AAB/APK is uploaded as an artifact right after signing, so it is
+kept even if the target-SDK check or the Play upload fails. A run summary is
+written, and the workflow output `artifact` holds the artifact name.
 
 #### Required secrets (org or repo level)
 
@@ -488,12 +523,19 @@ jobs:
 | `platforms` | | `both` | `ios` \| `android` \| `both` |
 | `meteor_server` | **yes** | — | Meteor DDP server URL |
 | `node_version` | | `20` | Node.js version |
+| `setup_pnpm` | | `false` | Install pnpm (version from `packageManager` in `package.json`) |
+| `install_command` | | `meteor npm install` | Command that installs dependencies |
+| `mobile_settings` | | — | Settings JSON passed to `meteor build --mobile-settings` |
 | `pre_build_script` | | — | Inline bash to run before `meteor build` |
 | `ios_app_identifier` | if building iOS | — | iOS bundle ID |
 | `xcode_path` | | `/Applications/Xcode_26.app` | Absolute path to Xcode.app |
+| `ios_runner` | | `macos-latest` | Runner label for the iOS job |
 | `ios_signing_mode` | | `match` | iOS `match`, `secrets`, or `cert-api` |
 | `upload_to_testflight` | | `true` | Upload IPA to TestFlight |
+| `ios_artifact_name` | | `ios-ipa` | Artifact name for the IPA + dSYM |
 | `android_app_identifier` | if building Android | — | Android applicationId |
+| `android_runner` | | `ubuntu-latest` | Runner label for the Android job |
+| `free_disk_space` | | `false` | Free runner disk space before the Android build |
 | `java_version` | | `17` | JDK version |
 | `android_api_level` | | `36` | Android SDK platform API level and expected AAB target SDK |
 | `android_build_tools` | | `36.0.0` | Android SDK build-tools version |
@@ -502,6 +544,35 @@ jobs:
 | `upload_to_play` | | `true` | Upload the signed AAB to Google Play |
 | `play_track` | | `internal` | `internal` \| `alpha` \| `beta` \| `production` |
 | `rollout_fraction` | | — | Android staged rollout fraction |
+| `android_artifact_name` | | `android-<android_build_type>` | Artifact name for the signed AAB/APK |
+
+Workflow outputs `ios_artifact` and `android_artifact` hold the uploaded
+artifact names.
+
+#### pnpm-based Meteor app
+
+```yaml
+jobs:
+  mobile:
+    uses: mieweb/actions/.github/workflows/build-mobile-from-meteor.yml@v2
+    secrets: inherit
+    with:
+      platforms:              both
+      node_version:           "24"
+      setup_pnpm:             true
+      install_command:        pnpm install --frozen-lockfile
+      mobile_settings:        settings.json
+      meteor_server:          https://app.example.com
+      ios_app_identifier:     com.example.app
+      ios_signing_mode:       cert-api
+      android_app_identifier: com.example.app
+      ios_artifact_name:      app-ios-${{ github.run_number }}
+      android_artifact_name:  app-android-${{ github.run_number }}
+```
+
+`setup_pnpm` reads the pnpm version from the `packageManager` field in
+`package.json`. `mobile_settings` ships with the app binary, so keep secrets
+out of it.
 
 ## Org-level secrets (recommended)
 
@@ -521,5 +592,5 @@ a different cert or profile.
   `meteor build`, `expo prebuild`) before invoking the
   `sign-archive-upload-ios` action directly.
 - **Android builds run on Linux.** `build-android-from-meteor.yml` uses
-  `ubuntu-latest`; the Gradle project is auto-discovered under the Meteor
-  build output directory.
+  `ubuntu-latest` by default (override with `runner`); the Gradle project is
+  auto-discovered under the Meteor build output directory.

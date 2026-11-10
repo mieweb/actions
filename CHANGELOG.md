@@ -1,6 +1,32 @@
 # Changelog
 
-## Unreleased
+## v2.4.0
+
+### Added
+
+- `prepare-meteor-cordova-env`, `prepare-android-env` — `setup_pnpm` installs
+  pnpm (version from `packageManager`), and `install_command` replaces the
+  hard-coded `meteor npm install` (still the default).
+- `run-meteor-build` — `mobile_settings` (`--mobile-settings`) and
+  `extra_args` inputs.
+- `sign-archive-upload-ios` — `output_directory` input (default
+  `${{ github.workspace }}/ios-ipa`) and `ipa_path` / `dsym_path` outputs.
+- `build-ios-from-meteor.yml`, `build-android-from-meteor.yml` — `runner`,
+  `setup_pnpm`, `install_command`, `mobile_settings` and `artifact_name`
+  inputs, an `artifact` output, and a run summary. Android also adds
+  `free_disk_space`.
+- `build-ios-from-meteor.yml` — uploads the IPA + dSYM and gym logs as
+  artifacts, even when signing or the TestFlight upload fails.
+- `build-mobile-from-meteor.yml` — forwards the new inputs (`ios_runner`,
+  `android_runner`, `ios_artifact_name`, `android_artifact_name`, …) and
+  exposes `ios_artifact` / `android_artifact` outputs.
+
+### Changed
+
+- `build-android-from-meteor.yml` uploads the signed artifact right after
+  signing, so it is kept when the target-SDK check or Play upload fails.
+
+## v2.3.0
 
 ### Changed
 

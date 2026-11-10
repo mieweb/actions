@@ -27,6 +27,10 @@ name: iOS Meteor/Cordova Build & Upload
 
 on:
   workflow_call:
+    outputs:
+      artifact:
+        description: "Name of the uploaded IPA + dSYM artifact"
+        value: ${{ jobs.build.outputs.artifact }}
     inputs:
       # ── App identity ────────────────────────────────────────────────────────
       app_identifier:
@@ -49,6 +53,21 @@ on:
         required: false
         type: string
         default: "20"
+      runner:
+        description: "Runner label for the macOS build job"
+        required: false
+        type: string
+        default: "macos-latest"
+      setup_pnpm:
+        description: "Install pnpm (version from the caller's package.json `packageManager`)"
+        required: false
+        type: boolean
+        default: false
+      install_command:
+        description: "Shell command that installs the project's dependencies"
+        required: false
+        type: string
+        default: "meteor npm install"
 
       # ── Customisation hook ──────────────────────────────────────────────────
       pre_build_script:
@@ -58,6 +77,11 @@ on:
         default: ""
 
       # ── Build configuration ─────────────────────────────────────────────────
+      mobile_settings:
+        description: "Path to a settings JSON file passed to `meteor build --mobile-settings`. Skipped if empty."
+        required: false
+        type: string
+        default: ""
       signing_mode:
         description: "'match', 'secrets', or 'cert-api'"
         required: false
@@ -68,10 +92,17 @@ on:
         required: false
         type: boolean
         default: true
+      artifact_name:
+        description: "Name of the uploaded IPA + dSYM artifact (build logs use `<name>-logs`)"
+        required: false
+        type: string
+        default: "ios-ipa"
 
 jobs:
   build:
-    runs-on: macos-latest
+    runs-on: ${{ inputs.runner }}
+    outputs:
+      artifact: ${{ inputs.artifact_name }}
     steps:
       # ── 1. Checkout, Xcode, Node, Meteor ──────────────────────────────────
       - name: Setup Meteor environment
@@ -79,6 +110,8 @@ jobs:
         with:
           xcode_path:   ${{ inputs.xcode_path }}
           node_version: ${{ inputs.node_version }}
+          setup_pnpm:      ${{ inputs.setup_pnpm }}
+          install_command: ${{ inputs.install_command }}
           # Prefer a caller-supplied PAT (read:packages) for GitHub Packages
           # auth; fall back to the automatic token for same-org callers.
           github_packages_token: ${{ secrets.GH_PACKAGES_TOKEN || github.token }}
@@ -118,6 +151,7 @@ jobs:
         with:
           platform: ios
           server: ${{ inputs.meteor_server }}
+          mobile_settings: ${{ inputs.mobile_settings }}
 
       # ── 4. Fastlane: pod install + sign + archive + upload ───────────────
       - name: Build & upload iOS to TestFlight
@@ -136,3 +170,51 @@ jobs:
           signing_mode:                ${{ inputs.signing_mode }}
           run_pod_install:             "true"
           upload_to_testflight:        ${{ inputs.upload_to_testflight }}
+
+      # ── 5. Keep the IPA, dSYM and gym logs (even if the upload failed) ────
+      # Globs on the action's default output_directory: step outputs may be
+      # unset when the composite step fails partway. continue-on-error keeps
+      # existing callers that run this workflow twice per run (duplicate
+      # default artifact name) from failing an otherwise successful build.
+      - name: Upload IPA and dSYM
+        if: always()
+        continue-on-error: true
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ inputs.artifact_name }}
+          path: |
+            ${{ github.workspace }}/ios-ipa/*.ipa
+            ${{ github.workspace }}/ios-ipa/*.dSYM.zip
+          if-no-files-found: warn
+
+      - name: Upload build logs
+        if: always()
+        continue-on-error: true
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ inputs.artifact_name }}-logs
+          path: ~/Library/Logs/gym
+          if-no-files-found: warn
+
+      # ── 6. Run summary ────────────────────────────────────────────────────
+      - name: Write run summary
+        if: always()
+        shell: bash
+        env:
+          APP_IDENTIFIER: ${{ inputs.app_identifier }}
+          METEOR_SERVER:  ${{ inputs.meteor_server }}
+          COMMIT_SHA:     ${{ github.sha }}
+          ARTIFACT_NAME:  ${{ inputs.artifact_name }}
+          PUBLISH:        ${{ inputs.upload_to_testflight }}
+        run: |
+          {
+            echo "### iOS build"
+            echo "| Field | Value |"
+            echo "|---|---|"
+            echo "| App identifier | \`$APP_IDENTIFIER\` |"
+            echo "| Server | $METEOR_SERVER |"
+            echo "| Build number | ${MOBILE_BUILD_NUMBER:-n/a} |"
+            echo "| Commit | \`$COMMIT_SHA\` |"
+            echo "| Artifact | \`$ARTIFACT_NAME\` |"
+            echo "| Upload to TestFlight | $PUBLISH |"
+          } >> "$GITHUB_STEP_SUMMARY"

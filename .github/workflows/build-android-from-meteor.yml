@@ -29,6 +29,10 @@ name: Android Meteor/Cordova Build, Sign & Publish
 
 on:
   workflow_call:
+    outputs:
+      artifact:
+        description: "Name of the uploaded signed AAB/APK artifact"
+        value: ${{ jobs.build.outputs.artifact }}
     inputs:
       # ── App identity ────────────────────────────────────────────────────────
       app_identifier:
@@ -61,6 +65,26 @@ on:
         required: false
         type: string
         default: "36.0.0"
+      runner:
+        description: "Runner label for the Linux build job"
+        required: false
+        type: string
+        default: "ubuntu-latest"
+      free_disk_space:
+        description: "Remove unused preinstalled toolchains from the runner before building"
+        required: false
+        type: boolean
+        default: false
+      setup_pnpm:
+        description: "Install pnpm (version from the caller's package.json `packageManager`)"
+        required: false
+        type: boolean
+        default: false
+      install_command:
+        description: "Shell command that installs the project's dependencies"
+        required: false
+        type: string
+        default: "meteor npm install"
 
       # ── Customisation hook ──────────────────────────────────────────────────
       pre_build_script:
@@ -70,6 +94,11 @@ on:
         default: ""
 
       # ── Build configuration ─────────────────────────────────────────────────
+      mobile_settings:
+        description: "Path to a settings JSON file passed to `meteor build --mobile-settings`. Skipped if empty."
+        required: false
+        type: string
+        default: ""
       signing_method:
         description: "'direct-keystore' or 'fastlane'"
         required: false
@@ -97,11 +126,30 @@ on:
         required: false
         type: string
         default: ""
+      artifact_name:
+        description: "Name of the uploaded signed artifact. Empty = `android-<build_type>`."
+        required: false
+        type: string
+        default: ""
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: ${{ inputs.runner }}
+    env:
+      ARTIFACT_NAME: ${{ inputs.artifact_name || format('android-{0}', inputs.build_type) }}
+    outputs:
+      artifact: ${{ env.ARTIFACT_NAME }}
     steps:
+      # ── 0. Optional: reclaim runner disk space ────────────────────────────
+      # Keeps /usr/local/lib/android: setup-android reuses that SDK.
+      - name: Free disk space
+        if: inputs.free_disk_space
+        shell: bash
+        run: |
+          sudo rm -rf /usr/share/dotnet /opt/ghc /usr/local/.ghcup /opt/hostedtoolcache/CodeQL
+          docker image prune -af
+          df -h /
+
       # ── 1. Checkout, JDK, Node, Android SDK, Meteor ───────────────────────
       - name: Setup Android environment
         uses: mieweb/actions/prepare-android-env@v2
@@ -110,6 +158,8 @@ jobs:
           node_version:        ${{ inputs.node_version }}
           android_api_level:   ${{ inputs.android_api_level }}
           android_build_tools: ${{ inputs.android_build_tools }}
+          setup_pnpm:          ${{ inputs.setup_pnpm }}
+          install_command:     ${{ inputs.install_command }}
           # Prefer a caller-supplied PAT (read:packages) for GitHub Packages
           # auth; fall back to the automatic token for same-org callers.
           github_packages_token: ${{ secrets.GH_PACKAGES_TOKEN || github.token }}
@@ -150,6 +200,7 @@ jobs:
           platform: android
           server: ${{ inputs.meteor_server }}
           output_dir: ./android-build
+          mobile_settings: ${{ inputs.mobile_settings }}
 
       # ── 4. Gradle sign (AAB/APK) ──────────────────────────────────────────
       - name: Build & sign Android app
@@ -166,7 +217,16 @@ jobs:
           key_alias:             ${{ secrets.ANDROID_KEY_ALIAS }}
           key_password:          ${{ secrets.ANDROID_KEY_PASSWORD }}
 
-      # ── 5. Verify the AAB targets the requested Android API ───────────────
+      # ── 5. Keep the signed artifact before any check or upload can fail ──
+      - name: Upload signed artifact
+        if: always() && steps.sign.outputs.signed_artifact_path != ''
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.ARTIFACT_NAME }}
+          path: ${{ steps.sign.outputs.signed_artifact_path }}
+          if-no-files-found: error
+
+      # ── 6. Verify the AAB targets the requested Android API ───────────────
       - name: Verify AAB target SDK
         if: inputs.build_type == 'bundle'
         shell: bash
@@ -191,7 +251,7 @@ jobs:
           fi
           echo "Verified AAB target SDK ${actual_target_sdk}."
 
-      # ── 6. Upload to Google Play (optional) ───────────────────────────────
+      # ── 7. Upload to Google Play (optional) ───────────────────────────────
       - name: Publish to Google Play
         if: inputs.upload_to_play && inputs.build_type == 'bundle'
         uses: mieweb/actions/publish-android-to-play@v2
@@ -202,10 +262,24 @@ jobs:
           track:                ${{ inputs.play_track }}
           rollout_fraction:     ${{ inputs.rollout_fraction }}
 
-      # ── 7. Always keep the signed artifact as a build output ──────────────
-      - name: Upload signed artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: android-${{ inputs.build_type }}
-          path: ${{ steps.sign.outputs.signed_artifact_path }}
-          if-no-files-found: error
+      # ── 8. Run summary ────────────────────────────────────────────────────
+      - name: Write run summary
+        if: always()
+        shell: bash
+        env:
+          APP_IDENTIFIER: ${{ inputs.app_identifier }}
+          METEOR_SERVER:  ${{ inputs.meteor_server }}
+          COMMIT_SHA:     ${{ github.sha }}
+          PUBLISH:        ${{ inputs.upload_to_play && inputs.build_type == 'bundle' }}
+        run: |
+          {
+            echo "### Android build"
+            echo "| Field | Value |"
+            echo "|---|---|"
+            echo "| App identifier | \`$APP_IDENTIFIER\` |"
+            echo "| Server | $METEOR_SERVER |"
+            echo "| Build number | ${MOBILE_BUILD_NUMBER:-n/a} |"
+            echo "| Commit | \`$COMMIT_SHA\` |"
+            echo "| Artifact | \`$ARTIFACT_NAME\` |"
+            echo "| Upload to Google Play | $PUBLISH |"
+          } >> "$GITHUB_STEP_SUMMARY"
