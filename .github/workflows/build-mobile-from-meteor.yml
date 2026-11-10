@@ -227,7 +227,7 @@ on:
 jobs:
   ios:
     if: inputs.platforms == 'ios' || inputs.platforms == 'both'
-    uses: mieweb/actions/.github/workflows/build-ios-from-meteor.yml@v2
+    uses: mieweb/actions/.github/workflows/build-ios-from-meteor.yml@feat/mobile-pipeline-pnpm-artifacts
     secrets: inherit
     with:
       app_identifier:       ${{ inputs.ios_app_identifier }}
@@ -245,7 +245,7 @@ jobs:
 
   android:
     if: inputs.platforms == 'android' || inputs.platforms == 'both'
-    uses: mieweb/actions/.github/workflows/build-android-from-meteor.yml@v2
+    uses: mieweb/actions/.github/workflows/build-android-from-meteor.yml@feat/mobile-pipeline-pnpm-artifacts
     secrets: inherit
     with:
       app_identifier:   ${{ inputs.android_app_identifier }}
