@@ -124,6 +124,7 @@ runs:
           sed -i.bak "s/GITHUB_TOKEN/${GH_PACKAGES_TOKEN}/g" .npmrc
           rm -f .npmrc.bak
         fi
-        # Passed via env (not ${{ }}) so the value is never spliced into the
-        # script; eval allows env-prefixed commands like `FOO=1 pnpm install`.
+        # Read from env rather than an inline expression so the value is never
+        # spliced into the script; eval allows env-prefixed commands like
+        # `FOO=1 pnpm install`.
         eval "$INSTALL_COMMAND"
