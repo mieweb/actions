@@ -89,6 +89,10 @@ inputs:
     description: "Upload the IPA to TestFlight after building"
     required: false
     default: "true"
+  output_directory:
+    description: "Directory where the signed IPA and dSYM zip are written"
+    required: false
+    default: ${{ github.workspace }}/ios-ipa
 
   # ── Ruby setup ────────────────────────────────────────────────────────────
   ruby_version:
@@ -99,6 +103,14 @@ inputs:
     description: "Install Ruby + bundle gems (set false if caller already did)"
     required: false
     default: "true"
+
+outputs:
+  ipa_path:
+    description: "Path to the signed IPA (empty if not produced)"
+    value: ${{ steps.locate.outputs.ipa_path }}
+  dsym_path:
+    description: "Path to the dSYM zip (empty if not produced)"
+    value: ${{ steps.locate.outputs.dsym_path }}
 
 runs:
   using: "composite"
@@ -183,7 +195,21 @@ runs:
         BUILD_CONFIGURATION:         ${{ inputs.build_configuration }}
         EXPORT_METHOD:               ${{ inputs.export_method }}
         UPLOAD_TO_TESTFLIGHT:        ${{ inputs.upload_to_testflight }}
+        OUTPUT_DIRECTORY:            ${{ inputs.output_directory }}
         # Fastlane tunables
         FASTLANE_SKIP_UPDATE_CHECK:  "1"
         FASTLANE_DISABLE_COLORS:     "1"
       run: bundle exec fastlane ios_build_upload
+
+    # ── 6. Expose IPA/dSYM paths (even if the upload failed) ────────────────
+    - name: Locate build outputs
+      id: locate
+      if: always()
+      shell: bash
+      env:
+        OUTPUT_DIRECTORY: ${{ inputs.output_directory }}
+      run: |
+        ipa=$(find "$OUTPUT_DIRECTORY" -maxdepth 1 -name '*.ipa' 2>/dev/null | head -n 1 || true)
+        dsym=$(find "$OUTPUT_DIRECTORY" -maxdepth 1 -name '*.app.dSYM.zip' 2>/dev/null | head -n 1 || true)
+        echo "ipa_path=$ipa" >> "$GITHUB_OUTPUT"
+        echo "dsym_path=$dsym" >> "$GITHUB_OUTPUT"

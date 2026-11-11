@@ -14,6 +14,14 @@ inputs:
     description: "Output directory for the build"
     required: false
     default: "./ios-build"
+  mobile_settings:
+    description: "Path to a settings JSON file passed as `--mobile-settings`. Skipped if empty."
+    required: false
+    default: ""
+  extra_args:
+    description: "Additional whitespace-separated arguments appended to `meteor build`"
+    required: false
+    default: ""
 
 runs:
   using: "composite"
@@ -24,7 +32,17 @@ runs:
         METEOR_PLATFORM: ${{ inputs.platform }}
         METEOR_SERVER: ${{ inputs.server }}
         METEOR_OUTPUT_DIR: ${{ inputs.output_dir }}
+        MOBILE_SETTINGS: ${{ inputs.mobile_settings }}
+        EXTRA_ARGS: ${{ inputs.extra_args }}
       run: |
-        meteor build "$METEOR_OUTPUT_DIR" \
-          --platforms "$METEOR_PLATFORM" \
-          --server="$METEOR_SERVER"
+        args=(build "$METEOR_OUTPUT_DIR"
+          --platforms "$METEOR_PLATFORM"
+          --server="$METEOR_SERVER")
+        if [ -n "$MOBILE_SETTINGS" ]; then
+          args+=(--mobile-settings "$MOBILE_SETTINGS")
+        fi
+        if [ -n "$EXTRA_ARGS" ]; then
+          read -r -a extra <<< "$EXTRA_ARGS"
+          args+=("${extra[@]}")
+        fi
+        meteor "${args[@]}"

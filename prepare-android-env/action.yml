@@ -1,8 +1,9 @@
 name: "Setup Meteor/Cordova Android Environment"
 description: >
   Composite action that checks out the caller's repo, installs the JDK,
-  Node.js, the Android SDK (platform + build-tools), and Meteor, then runs
-  `meteor npm install`. Prepares everything needed to build a signed Android
+  Node.js, the Android SDK (platform + build-tools), and Meteor (plus pnpm
+  when requested), then installs the project's dependencies (`meteor npm
+  install` by default). Prepares everything needed to build a signed Android
   app from a Meteor/Cordova project.
 
 inputs:
@@ -38,6 +39,16 @@ inputs:
       and submodules are skipped.
     required: false
     default: ""
+  setup_pnpm:
+    description: >
+      Install pnpm before the dependency install. The version is read from the
+      `packageManager` field of the caller's package.json.
+    required: false
+    default: "false"
+  install_command:
+    description: "Shell command that installs the project's dependencies"
+    required: false
+    default: "meteor npm install"
 
 runs:
   using: "composite"
@@ -67,6 +78,10 @@ runs:
       with:
         node-version: ${{ inputs.node_version }}
 
+    - name: Setup pnpm
+      if: inputs.setup_pnpm == 'true'
+      uses: pnpm/action-setup@v4
+
     - name: Setup Android SDK
       uses: android-actions/setup-android@v4
       with:
@@ -95,10 +110,11 @@ runs:
         curl https://install.meteor.com/ | sh
         echo "$HOME/.meteor" >> $GITHUB_PATH
 
-    - name: Install Meteor dependencies
+    - name: Install dependencies
       shell: bash
       env:
         GH_PACKAGES_TOKEN: ${{ inputs.github_packages_token }}
+        INSTALL_COMMAND: ${{ inputs.install_command }}
       run: |
         # The caller's .npmrc ships a bare GITHUB_TOKEN placeholder for private
         # GitHub Packages deps (e.g. @bluehive-health/*). Replace it with the
@@ -108,4 +124,7 @@ runs:
           sed -i.bak "s/GITHUB_TOKEN/${GH_PACKAGES_TOKEN}/g" .npmrc
           rm -f .npmrc.bak
         fi
-        meteor npm install
+        # Read from env rather than an inline expression so the value is never
+        # spliced into the script; eval allows env-prefixed commands like
+        # `FOO=1 pnpm install`.
+        eval "$INSTALL_COMMAND"

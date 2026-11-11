@@ -21,6 +21,9 @@
 # pass `secrets: inherit`. The declared secrets are forwarded to the nested
 # iOS/Android workflows via `secrets: inherit`.
 #
+# Outputs: `ios_artifact` / `android_artifact` name the uploaded build
+# artifacts (signed IPA + dSYM, signed AAB/APK) for downstream jobs.
+#
 # Secrets (all optional — pass only the ones your platform/mode needs):
 #   iOS:     APPLE_TEAM_ID, APPLE_API_KEY_ID, APPLE_API_ISSUER_ID,
 #            APPLE_API_KEY_P8_BASE64; match mode adds MATCH_GIT_BASIC_AUTHORIZATION
@@ -34,6 +37,13 @@ name: Mobile Build from Meteor (iOS + Android)
 
 on:
   workflow_call:
+    outputs:
+      ios_artifact:
+        description: "Name of the uploaded iOS IPA + dSYM artifact"
+        value: ${{ jobs.ios.outputs.artifact }}
+      android_artifact:
+        description: "Name of the uploaded Android AAB/APK artifact"
+        value: ${{ jobs.android.outputs.artifact }}
     inputs:
       # ── Platform selection ──────────────────────────────────────────────────
       platforms:
@@ -52,6 +62,21 @@ on:
         required: false
         type: string
         default: "20"
+      setup_pnpm:
+        description: "Install pnpm (version from the caller's package.json `packageManager`)"
+        required: false
+        type: boolean
+        default: false
+      install_command:
+        description: "Shell command that installs the project's dependencies"
+        required: false
+        type: string
+        default: "meteor npm install"
+      mobile_settings:
+        description: "Path to a settings JSON file passed to `meteor build --mobile-settings`. Skipped if empty."
+        required: false
+        type: string
+        default: ""
       pre_build_script:
         description: "Inline bash to run before the Meteor build. Skipped if empty."
         required: false
@@ -69,6 +94,11 @@ on:
         required: false
         type: string
         default: "/Applications/Xcode_26.app"
+      ios_runner:
+        description: "Runner label for the iOS build job"
+        required: false
+        type: string
+        default: "macos-latest"
       ios_signing_mode:
         description: "iOS signing: 'match', 'secrets', or 'cert-api'"
         required: false
@@ -79,6 +109,11 @@ on:
         required: false
         type: boolean
         default: true
+      ios_artifact_name:
+        description: "Name of the uploaded iOS IPA + dSYM artifact"
+        required: false
+        type: string
+        default: "ios-ipa"
 
       # ── Android ─────────────────────────────────────────────────────────────
       android_app_identifier:
@@ -86,6 +121,16 @@ on:
         required: false
         type: string
         default: ""
+      android_runner:
+        description: "Runner label for the Android build job"
+        required: false
+        type: string
+        default: "ubuntu-latest"
+      free_disk_space:
+        description: "Remove unused preinstalled toolchains from the Android runner before building"
+        required: false
+        type: boolean
+        default: false
       java_version:
         description: "JDK version for the Android/Gradle build"
         required: false
@@ -123,6 +168,11 @@ on:
         default: "internal"
       rollout_fraction:
         description: "Android staged rollout fraction (e.g. '0.1'). Empty = full release."
+        required: false
+        type: string
+        default: ""
+      android_artifact_name:
+        description: "Name of the uploaded Android artifact. Empty = `android-<android_build_type>`."
         required: false
         type: string
         default: ""
@@ -184,9 +234,14 @@ jobs:
       meteor_server:        ${{ inputs.meteor_server }}
       xcode_path:           ${{ inputs.xcode_path }}
       node_version:         ${{ inputs.node_version }}
+      setup_pnpm:           ${{ inputs.setup_pnpm }}
+      install_command:      ${{ inputs.install_command }}
+      mobile_settings:      ${{ inputs.mobile_settings }}
+      runner:               ${{ inputs.ios_runner }}
       pre_build_script:     ${{ inputs.pre_build_script }}
       signing_mode:         ${{ inputs.ios_signing_mode }}
       upload_to_testflight: ${{ inputs.upload_to_testflight }}
+      artifact_name:        ${{ inputs.ios_artifact_name }}
 
   android:
     if: inputs.platforms == 'android' || inputs.platforms == 'both'
@@ -199,9 +254,15 @@ jobs:
       java_version:     ${{ inputs.java_version }}
       android_api_level: ${{ inputs.android_api_level }}
       android_build_tools: ${{ inputs.android_build_tools }}
+      setup_pnpm:       ${{ inputs.setup_pnpm }}
+      install_command:  ${{ inputs.install_command }}
+      mobile_settings:  ${{ inputs.mobile_settings }}
+      runner:           ${{ inputs.android_runner }}
+      free_disk_space:  ${{ inputs.free_disk_space }}
       pre_build_script: ${{ inputs.pre_build_script }}
       signing_method:   ${{ inputs.android_signing_method }}
       build_type:       ${{ inputs.android_build_type }}
       upload_to_play:   ${{ inputs.upload_to_play }}
       play_track:       ${{ inputs.play_track }}
       rollout_fraction: ${{ inputs.rollout_fraction }}
+      artifact_name:    ${{ inputs.android_artifact_name }}
