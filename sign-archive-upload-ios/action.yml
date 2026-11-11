@@ -19,6 +19,10 @@ inputs:
   apple_team_id:
     description: "Apple Developer Team ID"
     required: true
+  extension_identifiers:
+    description: "Bundle IDs of app extensions embedded in the app (comma- or newline-separated), e.g. a broadcast or share extension. Each gets its own profile; match mode only."
+    required: false
+    default: ""
 
   # ── Match-mode inputs (ignored when signing_mode=secrets) ─────────────────
   match_git_url:
@@ -178,6 +182,7 @@ runs:
         # App identity
         APP_IDENTIFIER:              ${{ inputs.app_identifier }}
         APPLE_TEAM_ID:               ${{ inputs.apple_team_id }}
+        EXTENSION_IDENTIFIERS:       ${{ inputs.extension_identifiers }}
         # Match
         MATCH_PASSWORD:              ${{ inputs.match_password }}
         MATCH_GIT_BASIC_AUTHORIZATION: ${{ inputs.match_git_basic_authorization }}
