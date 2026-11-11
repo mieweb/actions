@@ -212,6 +212,7 @@ Supports three code-signing strategies.
 | `signing_mode` | | `match` | `match`, `secrets`, or `cert-api` |
 | `app_identifier` | **yes** | — | Bundle ID |
 | `apple_team_id` | **yes** | — | Apple Developer Team ID |
+| `extension_identifiers` | | — | Bundle IDs of app extensions embedded in the app (comma- or newline-separated). Match mode only: match fetches a profile for each, and each target is signed with the profile for its own bundle ID. Run once with `match_readonly: false` to create the new profiles. |
 | `match_git_url` | if match | `https://github.com/mieweb/mobile-signing` | Match signing repo URL |
 | `match_git_basic_authorization` | if match | — | Base64 `user:token` for the signing repo |
 | `match_password` | if match | — | Encryption passphrase for match |
