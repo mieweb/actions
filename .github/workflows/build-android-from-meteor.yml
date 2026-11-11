@@ -152,7 +152,7 @@ jobs:
 
       # ── 1. Checkout, JDK, Node, Android SDK, Meteor ───────────────────────
       - name: Setup Android environment
-        uses: mieweb/actions/prepare-android-env@feat/mobile-pipeline-pnpm-artifacts
+        uses: mieweb/actions/prepare-android-env@v2
         with:
           java_version:        ${{ inputs.java_version }}
           node_version:        ${{ inputs.node_version }}
@@ -195,7 +195,7 @@ jobs:
 
       # ── 3. Meteor/Cordova Android build ───────────────────────────────────
       - name: Build Android with Meteor/Cordova
-        uses: mieweb/actions/run-meteor-build@feat/mobile-pipeline-pnpm-artifacts
+        uses: mieweb/actions/run-meteor-build@v2
         with:
           platform: android
           server: ${{ inputs.meteor_server }}
@@ -205,7 +205,7 @@ jobs:
       # ── 4. Gradle sign (AAB/APK) ──────────────────────────────────────────
       - name: Build & sign Android app
         id: sign
-        uses: mieweb/actions/build-sign-android@feat/mobile-pipeline-pnpm-artifacts
+        uses: mieweb/actions/build-sign-android@v2
         with:
           signing_method:        ${{ inputs.signing_method }}
           app_identifier:        ${{ inputs.app_identifier }}
@@ -254,7 +254,7 @@ jobs:
       # ── 7. Upload to Google Play (optional) ───────────────────────────────
       - name: Publish to Google Play
         if: inputs.upload_to_play && inputs.build_type == 'bundle'
-        uses: mieweb/actions/publish-android-to-play@feat/mobile-pipeline-pnpm-artifacts
+        uses: mieweb/actions/publish-android-to-play@v2
         with:
           signed_artifact_path: ${{ steps.sign.outputs.signed_artifact_path }}
           play_json_key_base64: ${{ secrets.GOOGLE_PLAY_JSON_KEY_BASE64 }}
