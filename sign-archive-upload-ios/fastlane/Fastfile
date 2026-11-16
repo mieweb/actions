@@ -6,27 +6,40 @@ default_platform(:ios)
 # would fail, so the profiles are written into the project per target instead.
 def assign_profiles_per_target(workspace_path, profiles, team_id)
   require "xcodeproj"
-  project_path = Dir[File.join(File.dirname(workspace_path), "*.xcodeproj")].first
-  UI.user_error!("No .xcodeproj next to #{workspace_path}") unless project_path
-  project = Xcodeproj::Project.open(project_path)
+  # The projects the workspace itself lists (the app's project, Pods, any other
+  # referenced project), not whatever .xcodeproj happens to sit next to it.
+  workspace_dir = File.dirname(File.expand_path(workspace_path))
+  project_paths = Xcodeproj::Workspace.new_from_xcworkspace(workspace_path).file_references
+    .map { |ref| ref.absolute_path(workspace_dir) }
+    .select { |path| path.end_with?(".xcodeproj") && File.directory?(path) }
+  UI.user_error!("#{workspace_path} lists no .xcodeproj") if project_paths.empty?
+
   signed = []
-  project.native_targets.each do |target|
-    target.build_configurations.each do |config|
-      bundle_id = config.build_settings["PRODUCT_BUNDLE_IDENTIFIER"].to_s.delete('"')
-      profile = profiles[bundle_id]
-      next unless profile
-      config.build_settings["CODE_SIGN_STYLE"] = "Manual"
-      config.build_settings["DEVELOPMENT_TEAM"] = team_id
-      config.build_settings["PROVISIONING_PROFILE_SPECIFIER"] = profile
-      signed << bundle_id
-      UI.message("#{target.name} (#{config.name}) → #{profile}")
+  project_paths.each do |project_path|
+    project = Xcodeproj::Project.open(project_path)
+    changed = false
+    project.native_targets.each do |target|
+      target.build_configurations.each do |config|
+        # The effective bundle ID: follows xcconfig files, project-level
+        # inheritance and $(VAR) expansion, not only a literal target value.
+        bundle_id = config.resolve_build_setting("PRODUCT_BUNDLE_IDENTIFIER", target).to_s.delete('"')
+        profile = profiles[bundle_id]
+        next unless profile
+        config.build_settings["CODE_SIGN_STYLE"] = "Manual"
+        config.build_settings["DEVELOPMENT_TEAM"] = team_id
+        config.build_settings["PROVISIONING_PROFILE_SPECIFIER"] = profile
+        signed << bundle_id
+        changed = true
+        UI.message("#{target.name} (#{config.name}) → #{profile}")
+      end
     end
+    project.save if changed
   end
   missing = profiles.keys - signed.uniq
   unless missing.empty?
-    UI.user_error!("No target in #{File.basename(project_path)} builds #{missing.join(', ')}")
+    names = project_paths.map { |path| File.basename(path) }.join(", ")
+    UI.user_error!("No target in #{names} builds #{missing.join(', ')}")
   end
-  project.save
 end
 
 platform :ios do
