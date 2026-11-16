@@ -1,5 +1,15 @@
 # Changelog
 
+## Unreleased
+
+### Added
+
+- `sign-archive-upload-ios` — `extension_identifiers` input (match mode): bundle
+  IDs of app extensions embedded in the app. Match fetches a profile for each,
+  and each target is signed with the profile for its own bundle ID instead of
+  one `PROVISIONING_PROFILE_SPECIFIER` for every target, which fails for an
+  extension. Without it, nothing changes.
+
 ## v2.4.0
 
 ### Added
